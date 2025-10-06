@@ -36,13 +36,31 @@ const (
 	OpMulLocal // Multiply TOS with local variable, push result
 	OpDivLocal // Divide TOS by local variable, push result
 
-	// Comparison operations
+	// Comparison operations (generic - with runtime type checking)
 	OpEq // Equal
 	OpNe // Not equal
 	OpLt // Less than
 	OpGt // Greater than
 	OpLe // Less than or equal
 	OpGe // Greater than or equal
+
+	// Type-specialized comparison operations (Phase 2 optimization - no runtime checks!)
+	OpEqInt    // int == int → bool (no type checking)
+	OpEqFloat  // float == float → bool (no type checking)
+	OpEqString // string == string → bool (no type checking)
+	OpEqBool   // bool == bool → bool (no type checking)
+	OpNeInt    // int != int → bool (no type checking)
+	OpNeFloat  // float != float → bool (no type checking)
+	OpNeString // string != string → bool (no type checking)
+	OpNeBool   // bool != bool → bool (no type checking)
+	OpLtInt    // int < int → bool (no type checking)
+	OpLtFloat  // float < float → bool (no type checking)
+	OpGtInt    // int > int → bool (no type checking)
+	OpGtFloat  // float > float → bool (no type checking)
+	OpLeInt    // int <= int → bool (no type checking)
+	OpLeFloat  // float <= float → bool (no type checking)
+	OpGeInt    // int >= int → bool (no type checking)
+	OpGeFloat  // float >= float → bool (no type checking)
 
 	// Logical operations
 	OpAnd // Logical AND
@@ -151,6 +169,38 @@ func (op OpCode) String() string {
 		return "LE"
 	case OpGe:
 		return "GE"
+	case OpEqInt:
+		return "EQ_INT"
+	case OpEqFloat:
+		return "EQ_FLOAT"
+	case OpEqString:
+		return "EQ_STRING"
+	case OpEqBool:
+		return "EQ_BOOL"
+	case OpNeInt:
+		return "NE_INT"
+	case OpNeFloat:
+		return "NE_FLOAT"
+	case OpNeString:
+		return "NE_STRING"
+	case OpNeBool:
+		return "NE_BOOL"
+	case OpLtInt:
+		return "LT_INT"
+	case OpLtFloat:
+		return "LT_FLOAT"
+	case OpGtInt:
+		return "GT_INT"
+	case OpGtFloat:
+		return "GT_FLOAT"
+	case OpLeInt:
+		return "LE_INT"
+	case OpLeFloat:
+		return "LE_FLOAT"
+	case OpGeInt:
+		return "GE_INT"
+	case OpGeFloat:
+		return "GE_FLOAT"
 	case OpAnd:
 		return "AND"
 	case OpOr:

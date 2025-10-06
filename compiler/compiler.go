@@ -298,14 +298,19 @@ func (c *Compiler) Compile(node ast.Node) error {
 			c.emitTypedDiv(leftType, rightType)
 		case "%":
 			c.emitTypedMod(leftType, rightType)
-		case ">":
-			c.emit(vm.OpGt)
-		case ">=":
-			c.emit(vm.OpGe)
+		// Phase 2: Type-specialized comparisons
 		case "==":
-			c.emit(vm.OpEq)
+			c.emitTypedEq(leftType, rightType)
 		case "!=":
-			c.emit(vm.OpNe)
+			c.emitTypedNe(leftType, rightType)
+		case "<":
+			c.emitTypedLt(leftType, rightType)
+		case ">":
+			c.emitTypedGt(leftType, rightType)
+		case "<=":
+			c.emitTypedLe(leftType, rightType)
+		case ">=":
+			c.emitTypedGe(leftType, rightType)
 		case "&&":
 			c.emit(vm.OpAnd)
 		case "||":

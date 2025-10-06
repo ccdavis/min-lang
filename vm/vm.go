@@ -346,6 +346,136 @@ func (vm *VM) Run() error {
 					return err
 				}
 
+			// Type-specialized comparison operations (Phase 2 optimization)
+			// No runtime type checking - types are guaranteed by compiler
+			case OpEqInt:
+				right := vm.pop()
+				left := vm.pop()
+				err := vm.push(BoolValue(left.AsInt() == right.AsInt()))
+				if err != nil {
+					return err
+				}
+
+			case OpEqFloat:
+				right := vm.pop()
+				left := vm.pop()
+				err := vm.push(BoolValue(left.AsFloat() == right.AsFloat()))
+				if err != nil {
+					return err
+				}
+
+			case OpEqString:
+				right := vm.pop()
+				left := vm.pop()
+				err := vm.push(BoolValue(left.AsString() == right.AsString()))
+				if err != nil {
+					return err
+				}
+
+			case OpEqBool:
+				right := vm.pop()
+				left := vm.pop()
+				err := vm.push(BoolValue(left.AsBool() == right.AsBool()))
+				if err != nil {
+					return err
+				}
+
+			case OpNeInt:
+				right := vm.pop()
+				left := vm.pop()
+				err := vm.push(BoolValue(left.AsInt() != right.AsInt()))
+				if err != nil {
+					return err
+				}
+
+			case OpNeFloat:
+				right := vm.pop()
+				left := vm.pop()
+				err := vm.push(BoolValue(left.AsFloat() != right.AsFloat()))
+				if err != nil {
+					return err
+				}
+
+			case OpNeString:
+				right := vm.pop()
+				left := vm.pop()
+				err := vm.push(BoolValue(left.AsString() != right.AsString()))
+				if err != nil {
+					return err
+				}
+
+			case OpNeBool:
+				right := vm.pop()
+				left := vm.pop()
+				err := vm.push(BoolValue(left.AsBool() != right.AsBool()))
+				if err != nil {
+					return err
+				}
+
+			case OpLtInt:
+				right := vm.pop()
+				left := vm.pop()
+				err := vm.push(BoolValue(left.AsInt() < right.AsInt()))
+				if err != nil {
+					return err
+				}
+
+			case OpLtFloat:
+				right := vm.pop()
+				left := vm.pop()
+				err := vm.push(BoolValue(left.AsFloat() < right.AsFloat()))
+				if err != nil {
+					return err
+				}
+
+			case OpGtInt:
+				right := vm.pop()
+				left := vm.pop()
+				err := vm.push(BoolValue(left.AsInt() > right.AsInt()))
+				if err != nil {
+					return err
+				}
+
+			case OpGtFloat:
+				right := vm.pop()
+				left := vm.pop()
+				err := vm.push(BoolValue(left.AsFloat() > right.AsFloat()))
+				if err != nil {
+					return err
+				}
+
+			case OpLeInt:
+				right := vm.pop()
+				left := vm.pop()
+				err := vm.push(BoolValue(left.AsInt() <= right.AsInt()))
+				if err != nil {
+					return err
+				}
+
+			case OpLeFloat:
+				right := vm.pop()
+				left := vm.pop()
+				err := vm.push(BoolValue(left.AsFloat() <= right.AsFloat()))
+				if err != nil {
+					return err
+				}
+
+			case OpGeInt:
+				right := vm.pop()
+				left := vm.pop()
+				err := vm.push(BoolValue(left.AsInt() >= right.AsInt()))
+				if err != nil {
+					return err
+				}
+
+			case OpGeFloat:
+				right := vm.pop()
+				left := vm.pop()
+				err := vm.push(BoolValue(left.AsFloat() >= right.AsFloat()))
+				if err != nil {
+					return err
+				}
+
 			case OpEq, OpNe, OpLt, OpGt, OpLe, OpGe:
 				err := vm.executeComparison(op)
 				if err != nil {
