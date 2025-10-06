@@ -1,7 +1,19 @@
 package vm
 
 import (
+	"errors"
 	"fmt"
+)
+
+// Pre-allocated errors to avoid string allocation on error paths
+var (
+	ErrDivisionByZero        = errors.New("division by zero")
+	ErrModuloByZero          = errors.New("modulo by zero")
+	ErrStackOverflow         = errors.New("stack overflow")
+	ErrUnsupportedOperands   = errors.New("unsupported operand types")
+	ErrCallingNonFunction    = errors.New("calling non-function")
+	ErrUnsupportedComparison = errors.New("unsupported operand types for comparison")
+	ErrUnsupportedNegation   = errors.New("unsupported operand type for negation")
 )
 
 const (
@@ -15,6 +27,7 @@ type Frame struct {
 	cl          *Closure
 	ip          int      // instruction pointer
 	basePointer int      // base pointer for this frame
+	tempClosure Closure  // Embedded closure for non-closure function calls (avoids allocation)
 }
 
 // NewFrame creates a new frame
@@ -51,7 +64,7 @@ func New(bytecode *Bytecode) *VM {
 		NumLocals:    0,
 		NumParams:    0,
 	}
-	mainClosure := &Closure{Fn: mainFn, Free: []Value{}}
+	mainClosure := &Closure{Fn: mainFn, Free: nil}  // Use nil instead of empty slice
 	mainFrame := NewFrame(mainClosure, 0)
 
 	frames := make([]*Frame, MaxFrames)
@@ -81,7 +94,7 @@ func (vm *VM) currentFrame() *Frame {
 // push pushes a value onto the stack
 func (vm *VM) push(val Value) error {
 	if vm.sp >= StackSize {
-		return fmt.Errorf("stack overflow")
+		return ErrStackOverflow
 	}
 	vm.stack[vm.sp] = val
 	vm.sp++
@@ -116,6 +129,8 @@ func (vm *VM) Run() error {
 		ins := frame.Instructions()
 		ip := frame.ip
 
+		// fmt.Printf("DEBUG: Starting frame, ip=%d, insLen=%d\n", ip, len(ins))
+
 	innerLoop:
 		// Inner loop - executes instructions until frame change
 		for ip < len(ins) {
@@ -149,6 +164,74 @@ func (vm *VM) Run() error {
 				err := vm.executeBinaryOperation(op)
 				if err != nil {
 					return err
+				}
+
+			case OpAddLocal, OpSubLocal, OpMulLocal, OpDivLocal:
+				localIndex, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				// Get TOS and local value
+				tos := vm.pop()
+				local := vm.stack[frame.basePointer+localIndex]
+
+				// Perform operation directly without type checking overhead
+				// Handle integer operations (fast path)
+				if tos.Type == IntType && local.Type == IntType {
+					var result int64
+					switch op {
+					case OpAddLocal:
+						result = tos.AsInt() + local.AsInt()
+					case OpSubLocal:
+						result = tos.AsInt() - local.AsInt()
+					case OpMulLocal:
+						result = tos.AsInt() * local.AsInt()
+					case OpDivLocal:
+						if local.AsInt() == 0 {
+							return ErrDivisionByZero
+						}
+						result = tos.AsInt() / local.AsInt()
+					}
+					err := vm.push(IntValue(result))
+					if err != nil {
+						return err
+					}
+				} else if (tos.Type == FloatType || tos.Type == IntType) &&
+					(local.Type == FloatType || local.Type == IntType) {
+					// Handle float operations
+					var tosVal, localVal float64
+
+					if tos.Type == FloatType {
+						tosVal = tos.AsFloat()
+					} else {
+						tosVal = float64(tos.AsInt())
+					}
+
+					if local.Type == FloatType {
+						localVal = local.AsFloat()
+					} else {
+						localVal = float64(local.AsInt())
+					}
+
+					var result float64
+					switch op {
+					case OpAddLocal:
+						result = tosVal + localVal
+					case OpSubLocal:
+						result = tosVal - localVal
+					case OpMulLocal:
+						result = tosVal * localVal
+					case OpDivLocal:
+						if localVal == 0 {
+							return ErrDivisionByZero
+						}
+						result = tosVal / localVal
+					}
+					err := vm.push(FloatValue(result))
+					if err != nil {
+						return err
+					}
+				} else {
+					return fmt.Errorf("unsupported operand types for local operation")
 				}
 
 			case OpNeg:
@@ -191,7 +274,10 @@ func (vm *VM) Run() error {
 				globalIndex, _ := ReadOperand(ins, ip)
 				ip += 2
 
-				err := vm.push(vm.globals[globalIndex])
+				value := vm.globals[globalIndex]
+				// DEBUG
+				// fmt.Printf("DEBUG: LoadGlobal[%d] = %v\n", globalIndex, value)
+				err := vm.push(value)
 				if err != nil {
 					return err
 				}
@@ -200,7 +286,10 @@ func (vm *VM) Run() error {
 				globalIndex, _ := ReadOperand(ins, ip)
 				ip += 2
 
-				vm.globals[globalIndex] = vm.pop()
+				value := vm.pop()
+				vm.globals[globalIndex] = value
+				// DEBUG
+				// fmt.Printf("DEBUG: StoreGlobal[%d] = %v\n", globalIndex, value)
 
 			case OpLoadLocal:
 				localIndex, _ := ReadOperand(ins, ip)
@@ -249,15 +338,18 @@ func (vm *VM) Run() error {
 				numArgs, _ := ReadOperand(ins, ip)
 				ip += 2
 
+				// fmt.Printf("DEBUG: OpCall with %d args\n", numArgs)
 				frame.ip = ip // Sync before call
 				err := vm.executeCall(numArgs)
 				if err != nil {
 					return err
 				}
+				// fmt.Printf("DEBUG: OpCall completed, breaking to reload frame\n")
 				break innerLoop // Break to reload new frame
 
 			case OpReturn:
 				returnValue := vm.pop()
+				// fmt.Printf("DEBUG: OpReturn with value %v\n", returnValue)
 
 				// Set sp to where the function was (one before the first argument)
 				// This removes the function and all arguments from the stack
@@ -269,6 +361,7 @@ func (vm *VM) Run() error {
 				if err != nil {
 					return err
 				}
+				// fmt.Printf("DEBUG: OpReturn pushed value, returning to previous frame\n")
 				break innerLoop // Break to reload previous frame
 
 			case OpMakeClosure:
@@ -555,7 +648,15 @@ func (vm *VM) Run() error {
 		}
 
 		// Sync IP after inner loop completes normally
+		// NOTE: If we broke out of innerLoop (e.g. from OpReturn or OpCall),
+		// this syncs the IP for the frame we just left, which is fine.
 		frame.ip = ip
+
+		// Reload frame variables after potential frame change
+		// (OpCall, OpReturn, OpJump can all change frames or IP)
+		frame = vm.frames[vm.framesIndex-1]
+		ins = frame.Instructions()
+		ip = frame.ip
 
 		// If we're in the main frame and completed all instructions, exit
 		if vm.framesIndex == 1 && ip >= len(ins) {
@@ -586,8 +687,7 @@ func (vm *VM) executeBinaryOperation(op OpCode) error {
 	// Handle float operations
 	if (left.Type == FloatType || left.Type == IntType) &&
 		(right.Type == FloatType || right.Type == IntType) {
-		leftVal := float64(0)
-		rightVal := float64(0)
+		var leftVal, rightVal float64
 
 		if left.Type == FloatType {
 			leftVal = left.AsFloat()
@@ -604,7 +704,7 @@ func (vm *VM) executeBinaryOperation(op OpCode) error {
 		return vm.executeBinaryFloatOperation(op, leftVal, rightVal)
 	}
 
-	return fmt.Errorf("unsupported operand types for binary operation")
+	return ErrUnsupportedOperands
 }
 
 // executeBinaryIntegerOperation executes a binary integer operation
@@ -620,12 +720,12 @@ func (vm *VM) executeBinaryIntegerOperation(op OpCode, left, right int64) error 
 		result = left * right
 	case OpDiv:
 		if right == 0 {
-			return fmt.Errorf("division by zero")
+			return ErrDivisionByZero
 		}
 		result = left / right
 	case OpMod:
 		if right == 0 {
-			return fmt.Errorf("modulo by zero")
+			return ErrModuloByZero
 		}
 		result = left % right
 	default:
@@ -648,7 +748,7 @@ func (vm *VM) executeBinaryFloatOperation(op OpCode, left, right float64) error 
 		result = left * right
 	case OpDiv:
 		if right == 0 {
-			return fmt.Errorf("division by zero")
+			return ErrDivisionByZero
 		}
 		result = left / right
 	default:
@@ -671,8 +771,7 @@ func (vm *VM) executeComparison(op OpCode) error {
 	// Handle float comparisons
 	if (left.Type == FloatType || left.Type == IntType) &&
 		(right.Type == FloatType || right.Type == IntType) {
-		leftVal := float64(0)
-		rightVal := float64(0)
+		var leftVal, rightVal float64
 
 		if left.Type == FloatType {
 			leftVal = left.AsFloat()
@@ -701,7 +800,7 @@ func (vm *VM) executeComparison(op OpCode) error {
 		}
 	}
 
-	return fmt.Errorf("unsupported operand types for comparison")
+	return ErrUnsupportedComparison
 }
 
 // executeIntegerComparison executes an integer comparison
@@ -779,7 +878,7 @@ func (vm *VM) executeCall(numArgs int) error {
 	case BuiltinFunctionType:
 		return vm.executeBuiltin(callee.AsBuiltinFunction(), numArgs)
 	default:
-		return fmt.Errorf("calling non-function")
+		return ErrCallingNonFunction
 	}
 }
 
@@ -820,7 +919,6 @@ func (vm *VM) callFunction(fn *Function, numArgs int) error {
 			fn.NumParams, numArgs)
 	}
 
-	cl := &Closure{Fn: fn, Free: []Value{}}
 	basePointer := vm.sp - numArgs
 
 	// Reuse existing frame if available, otherwise allocate new
@@ -830,8 +928,12 @@ func (vm *VM) callFunction(fn *Function, numArgs int) error {
 		vm.frames[vm.framesIndex] = frame
 	}
 
+	// Use embedded closure to avoid heap allocation
+	frame.tempClosure.Fn = fn
+	frame.tempClosure.Free = nil  // No free variables for regular functions
+	frame.cl = &frame.tempClosure
+
 	// Reset frame fields
-	frame.cl = cl
 	frame.ip = 0
 	frame.basePointer = basePointer
 

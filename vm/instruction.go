@@ -52,7 +52,8 @@ func Disassemble(bytecode []byte) string {
 			}
 		case OpPush, OpLoadGlobal, OpStoreGlobal, OpLoadLocal, OpStoreLocal,
 			OpLoadFree, OpJump, OpJumpIfFalse, OpJumpIfTrue, OpCall,
-			OpGetBuiltin, OpArray, OpMap, OpStruct, OpGetField, OpSetField:
+			OpGetBuiltin, OpArray, OpMap, OpStruct, OpGetField, OpSetField,
+			OpAddLocal, OpSubLocal, OpMulLocal, OpDivLocal:
 			if i+2 < len(bytecode) {
 				operand, _ := ReadOperand(bytecode, i+1)
 				result += fmt.Sprintf(" %d", operand)

@@ -18,6 +18,12 @@ const (
 	OpMod // Modulo operation
 	OpNeg // Negate top of stack
 
+	// Direct local operations (no push/pop overhead)
+	OpAddLocal // Add TOS with local variable, push result
+	OpSubLocal // Subtract local from TOS, push result
+	OpMulLocal // Multiply TOS with local variable, push result
+	OpDivLocal // Divide TOS by local variable, push result
+
 	// Comparison operations
 	OpEq // Equal
 	OpNe // Not equal
@@ -93,6 +99,14 @@ func (op OpCode) String() string {
 		return "MOD"
 	case OpNeg:
 		return "NEG"
+	case OpAddLocal:
+		return "ADD_LOCAL"
+	case OpSubLocal:
+		return "SUB_LOCAL"
+	case OpMulLocal:
+		return "MUL_LOCAL"
+	case OpDivLocal:
+		return "DIV_LOCAL"
 	case OpEq:
 		return "EQ"
 	case OpNe:

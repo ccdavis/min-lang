@@ -7,6 +7,7 @@ import (
 	"minlang/parser"
 	"minlang/vm"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -47,8 +48,34 @@ func main() {
 		os.Exit(1)
 	}
 
+	bytecode := c.Bytecode()
+
+	// Debug: print bytecode if --debug flag is present
+	if len(os.Args) > 2 && os.Args[2] == "--debug" {
+		fmt.Println("=== Bytecode Debug ===")
+		fmt.Printf("Total constants: %d\n", len(bytecode.Constants))
+		for i, constant := range bytecode.Constants {
+			fmt.Printf("Constant %d: Type=%d", i, constant.Type)
+			if constant.Type == 7 { // FunctionType
+				fn := constant.AsFunction()
+				fmt.Printf(" [Function: %s params=%d locals=%d]\n", fn.Name, fn.NumParams, fn.NumLocals)
+				fmt.Println("  Function bytecode:")
+				for _, line := range strings.Split(vm.Disassemble(fn.Instructions), "\n") {
+					if line != "" {
+						fmt.Println("   ", line)
+					}
+				}
+			} else {
+				fmt.Printf(" Value=%v\n", constant)
+			}
+		}
+		fmt.Println("\n=== Main Bytecode ===")
+		fmt.Println(vm.Disassemble(bytecode.Instructions))
+		fmt.Println()
+	}
+
 	// Run
-	machine := vm.New(c.Bytecode())
+	machine := vm.New(bytecode)
 	err = machine.Run()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Runtime error: %v\n", err)

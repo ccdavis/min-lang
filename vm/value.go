@@ -11,6 +11,14 @@ import (
 // No locking needed - VM is single-threaded
 var stringPool []*string
 
+// Object pools to keep heap-allocated objects alive for GC
+// The GC doesn't track uint64, so we need to keep references to heap-allocated data
+var functionPool []*Function
+var closurePool []*Closure
+var arrayPool []*ArrayValue
+var mapPool []*MapValue
+var structPool []*StructValue
+
 // ValueType represents the type of a value
 type ValueType byte
 
@@ -144,6 +152,8 @@ type ArrayValue struct {
 
 func NewArrayValue(size int) Value {
 	arr := &ArrayValue{Elements: make([]Value, size)}
+	// Add to pool to keep it alive for GC
+	arrayPool = append(arrayPool, arr)
 	return Value{
 		Type: ArrayType,
 		Data: uint64(uintptr(unsafe.Pointer(arr))),
@@ -168,6 +178,8 @@ type MapValue struct {
 
 func NewMapValue() Value {
 	m := &MapValue{Pairs: make(map[MapKey]Value)}
+	// Add to pool to keep it alive for GC
+	mapPool = append(mapPool, m)
 	return Value{
 		Type: MapType,
 		Data: uint64(uintptr(unsafe.Pointer(m))),
@@ -197,6 +209,8 @@ func NewStructValue(typeName string, fields map[string]Value) Value {
 		TypeName: typeName,
 		Fields:   fields,
 	}
+	// Add to pool to keep it alive for GC
+	structPool = append(structPool, s)
 	return Value{
 		Type: StructType,
 		Data: uint64(uintptr(unsafe.Pointer(s))),
@@ -217,6 +231,8 @@ type Function struct {
 }
 
 func NewFunctionValue(fn *Function) Value {
+	// Add to pool to keep it alive for GC
+	functionPool = append(functionPool, fn)
 	return Value{Type: FunctionType, Data: uint64(uintptr(unsafe.Pointer(fn)))}
 }
 
@@ -232,6 +248,8 @@ type Closure struct {
 
 func NewClosureValue(fn *Function, free []Value) Value {
 	cl := &Closure{Fn: fn, Free: free}
+	// Add to pool to keep it alive for GC
+	closurePool = append(closurePool, cl)
 	return Value{
 		Type: ClosureType,
 		Data: uint64(uintptr(unsafe.Pointer(cl))),

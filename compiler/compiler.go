@@ -173,6 +173,32 @@ func (c *Compiler) addConstant(obj vm.Value) int {
 	return len(c.constants) - 1
 }
 
+// tryEmitDirectLocalOp attempts to optimize binary operations with local variables
+// If the last instruction was OpLoadLocal, it replaces it with a direct local operation
+func (c *Compiler) tryEmitDirectLocalOp(normalOp, directLocalOp vm.OpCode) {
+	// Check if last instruction was OpLoadLocal
+	if c.lastInstructionIs(vm.OpLoadLocal) {
+		// Get the position and extract the local index
+		lastPos := c.scopes[c.scopeIndex].lastInstruction.Position
+		ins := c.currentInstructions()
+
+		// Extract the local index from the OpLoadLocal instruction
+		localIndex, _ := vm.ReadOperand(ins, lastPos+1)
+
+		// Replace OpLoadLocal with the direct local operation in place
+		newIns := vm.Make(directLocalOp, localIndex)
+		for i := 0; i < len(newIns); i++ {
+			ins[lastPos+i] = newIns[i]
+		}
+
+		// Update the last instruction opcode
+		c.scopes[c.scopeIndex].lastInstruction.Opcode = directLocalOp
+	} else {
+		// No optimization possible, emit normal operation
+		c.emit(normalOp)
+	}
+}
+
 func (c *Compiler) enterScope() {
 	scope := CompilationScope{
 		instructions:        vm.Instruction{},
@@ -258,13 +284,13 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		switch node.Operator {
 		case "+":
-			c.emit(vm.OpAdd)
+			c.tryEmitDirectLocalOp(vm.OpAdd, vm.OpAddLocal)
 		case "-":
-			c.emit(vm.OpSub)
+			c.tryEmitDirectLocalOp(vm.OpSub, vm.OpSubLocal)
 		case "*":
-			c.emit(vm.OpMul)
+			c.tryEmitDirectLocalOp(vm.OpMul, vm.OpMulLocal)
 		case "/":
-			c.emit(vm.OpDiv)
+			c.tryEmitDirectLocalOp(vm.OpDiv, vm.OpDivLocal)
 		case "%":
 			c.emit(vm.OpMod)
 		case ">":
