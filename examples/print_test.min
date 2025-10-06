@@ -1,0 +1,14 @@
+// Test the print built-in function
+
+print("Hello, MinLang!");
+print("Testing numbers:", 42);
+print("Math:", 2 + 3);
+
+var x: int = 100;
+print("Variable x =", x);
+
+func greet(name: string) {
+	print("Hello,", name);
+}
+
+greet("World");

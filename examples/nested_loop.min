@@ -1,0 +1,11 @@
+var total: int = 0;
+var row: int = 0;
+for row < 5 {
+    var col: int = 0;
+    for col < 5 {
+        total = total + 1;
+        col = col + 1;
+    }
+    row = row + 1;
+}
+print(total);

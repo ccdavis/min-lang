@@ -1,0 +1,51 @@
+// Enum demonstration
+
+type Color = enum { Red, Green, Blue }
+type Status = enum { Pending, Active, Completed, Failed }
+
+print("=== Enum Values ===");
+print("Red:", Red);
+print("Green:", Green);
+print("Blue:", Blue);
+print("");
+
+print("Status.Pending:", Pending);
+print("Status.Active:", Active);
+print("Status.Completed:", Completed);
+print("Status.Failed:", Failed);
+print("");
+
+// Using enumName to get string representation
+print("=== Enum Names ===");
+var colorValue: int = Red;
+var colorName = enumName("Color", colorValue);
+print("Color value", colorValue, "is", colorName);
+
+var statusValue: int = Active;
+var statusName = enumName("Status", statusValue);
+print("Status value", statusValue, "is", statusName);
+print("");
+
+// Using enumValue to parse strings
+print("=== Parsing Enum Names ===");
+var blueValue = enumValue("Color", "Blue");
+print("Blue enum value:", blueValue);
+
+var completedValue = enumValue("Status", "Completed");
+print("Completed enum value:", completedValue);
+print("");
+
+// Using enums in comparisons
+print("=== Enum Comparisons ===");
+var currentColor: int = Green;
+if currentColor == Red {
+    print("Current color is Red");
+}
+if currentColor == Green {
+    print("Current color is Green");
+}
+
+var taskStatus: int = Completed;
+if taskStatus == Completed {
+    print("Task is completed!");
+}

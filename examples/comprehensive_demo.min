@@ -1,0 +1,112 @@
+// Comprehensive demo of MinLang features
+
+print("=== MinLang Feature Showcase ===");
+print("");
+
+// Constants
+const MAX_ITEMS: int = 100;
+const APP_NAME: string = "MinLang Demo";
+print("Application:", APP_NAME);
+print("Max items:", MAX_ITEMS);
+print("");
+
+// Arrays
+print("=== Arrays ===");
+var fibonacci: []int = [1, 1, 2, 3, 5, 8, 13];
+print("Fibonacci numbers:", len(fibonacci));
+print("5th Fibonacci:", fibonacci[4]);
+
+fibonacci = append(fibonacci, 21, 34);
+print("After append:", len(fibonacci));
+print("");
+
+// Maps
+print("=== Maps ===");
+var capitals: map[string]string = map[string]string{
+    "France": "Paris",
+    "Japan": "Tokyo",
+    "USA": "Washington DC"
+};
+
+print("Number of countries:", len(capitals));
+print("Capital of Japan:", capitals["Japan"]);
+
+var countries = keys(capitals);
+print("First country:", countries[0]);
+print("");
+
+// Structs
+print("=== Structs ===");
+var person = Person{
+    name: "Alice",
+    age: 30,
+    city: "New York"
+};
+
+print("Person name:", person.name);
+print("Person age:", person.age);
+person.age = 31;
+print("Updated age:", person.age);
+print("");
+
+// Functions with recursion
+func factorial(n: int): int {
+    if n <= 1 {
+        return 1;
+    }
+    return n * factorial(n - 1);
+}
+
+print("=== Functions ===");
+var fact5 = factorial(5);
+print("5! =", fact5);
+print("");
+
+// Break and continue
+print("=== Control Flow ===");
+var sum: int = 0;
+for var i: int = 1; i <= 100; i = i + 1 {
+    if i > 10 {
+        break;
+    }
+    sum = sum + i;
+}
+print("Sum with break (1-10):", sum);
+
+var oddSum: int = 0;
+for var j: int = 1; j <= 10; j = j + 1 {
+    if j % 2 == 0 {
+        continue;
+    }
+    oddSum = oddSum + j;
+}
+print("Odd sum with continue:", oddSum);
+print("");
+
+// String operations
+print("=== Strings ===");
+var greeting: string = "Hello, " + "MinLang!";
+print(greeting);
+print("Length:", len(greeting));
+print("First char:", greeting[0]);
+print("");
+
+// Advanced array operations
+print("=== Advanced Operations ===");
+var source: []int = [10, 20, 30];
+var backup = copy(source);
+print("Backup created, length:", len(backup));
+
+// Count even numbers using continue
+var evenCount: int = 0;
+var numbers: []int = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+for var i: int = 0; i < len(numbers); i = i + 1 {
+    if numbers[i] % 2 != 0 {
+        continue;  // Skip odd numbers
+    }
+    evenCount = evenCount + 1;
+}
+print("Even numbers count:", evenCount);
+
+print("");
+print("=== Demo Complete ===");

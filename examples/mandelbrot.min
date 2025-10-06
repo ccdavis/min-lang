@@ -1,0 +1,98 @@
+// Mandelbrot Set Renderer
+// Renders an ASCII visualization of the Mandelbrot set
+
+// Configuration
+const WIDTH: int = 80;
+const HEIGHT: int = 40;
+const MAX_ITER: int = 100;
+
+// Mandelbrot bounds in complex plane
+const XMIN: float = -2.5;
+const XMAX: float = 1.0;
+const YMIN: float = -1.0;
+const YMAX: float = 1.0;
+
+// Calculate iterations for a point in the complex plane
+func mandelbrot(cx: float, cy: float): int {
+    var x: float = 0.0;
+    var y: float = 0.0;
+    var iter: int = 0;
+
+    for iter < MAX_ITER {
+        var x2: float = x * x;
+        var y2: float = y * y;
+
+        // Check if point escaped (magnitude > 2)
+        if x2 + y2 > 4.0 {
+            return iter;
+        }
+
+        // z = z^2 + c
+        var xtemp: float = x2 - y2 + cx;
+        y = 2.0 * x * y + cy;
+        x = xtemp;
+
+        iter = iter + 1;
+    }
+
+    return MAX_ITER;
+}
+
+// Convert iteration count to ASCII character
+func iterToChar(iter: int): string {
+    if iter == MAX_ITER {
+        return " ";
+    }
+    if iter > 80 {
+        return ".";
+    }
+    if iter > 60 {
+        return ":";
+    }
+    if iter > 40 {
+        return "-";
+    }
+    if iter > 20 {
+        return "=";
+    }
+    if iter > 10 {
+        return "+";
+    }
+    if iter > 5 {
+        return "*";
+    }
+    return "#";
+}
+
+print("Rendering Mandelbrot Set...");
+print("Size:", WIDTH, "x", HEIGHT);
+print("Max iterations:", MAX_ITER);
+print("");
+
+// Render the Mandelbrot set
+var row: int = 0;
+for row < HEIGHT {
+    var line: string = "";
+    var col: int = 0;
+
+    for col < WIDTH {
+        // Map pixel to complex plane
+        var cx: float = XMIN + (XMAX - XMIN) * col / WIDTH;
+        var cy: float = YMIN + (YMAX - YMIN) * row / HEIGHT;
+
+        // Calculate iterations
+        var iter: int = mandelbrot(cx, cy);
+
+        // Convert to character
+        var char: string = iterToChar(iter);
+        line = line + char;
+
+        col = col + 1;
+    }
+
+    print(line);
+    row = row + 1;
+}
+
+print("");
+print("Rendering complete!");

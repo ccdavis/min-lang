@@ -1,0 +1,13 @@
+// Sum numbers using a for loop
+
+func sum_to_n(n: int): int {
+	var sum: int = 0;
+	for var i: int = 1; i <= n; i = i + 1 {
+		sum = sum + i;
+	}
+	return sum;
+}
+
+print("Sum of 1 to 10:", sum_to_n(10));
+print("Sum of 1 to 100:", sum_to_n(100));
+print("Sum of 1 to 1000:", sum_to_n(1000));

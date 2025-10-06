@@ -1,0 +1,34 @@
+// Simple switch demonstration
+
+var x: int = 2;
+
+switch x {
+case 1 {
+    print("x is 1");
+}
+case 2 {
+    print("x is 2");
+}
+case 3 {
+    print("x is 3");
+}
+default {
+    print("x is something else");
+}
+}
+
+type Status = enum { Pending, Active, Done }
+
+var status: int = Active;
+
+switch status {
+case Pending {
+    print("Status: Pending");
+}
+case Active {
+    print("Status: Active");
+}
+case Done {
+    print("Status: Done");
+}
+}

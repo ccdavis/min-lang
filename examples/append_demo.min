@@ -1,0 +1,32 @@
+// Demonstrate append builtin
+
+var numbers: []int = [1, 2, 3];
+print("Original array:", len(numbers), "elements");
+
+// Append single element
+var numbers2 = append(numbers, 4);
+print("After append(numbers, 4):", len(numbers2), "elements");
+
+// Append multiple elements
+var numbers3 = append(numbers2, 5, 6, 7);
+print("After append with multiple values:", len(numbers3), "elements");
+
+// Building an array incrementally
+var primes: []int = [];
+primes = append(primes, 2);
+primes = append(primes, 3);
+primes = append(primes, 5);
+primes = append(primes, 7);
+primes = append(primes, 11);
+
+print("First 5 primes:", len(primes), "elements");
+print("First prime:", primes[0]);
+print("Fifth prime:", primes[4]);
+
+// Use in loop
+var squares: []int = [];
+for var i: int = 1; i <= 10; i = i + 1 {
+    squares = append(squares, i * i);
+}
+print("Squares from 1-10:", len(squares), "elements");
+print("10 squared:", squares[9]);

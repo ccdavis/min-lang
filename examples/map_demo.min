@@ -1,0 +1,23 @@
+// Create a map
+var ages: map[string]int = map[string]int{
+    "Alice": 30,
+    "Bob": 25,
+    "Charlie": 35
+};
+
+print("Map length:", len(ages));
+print("Alice's age:", ages["Alice"]);
+print("Bob's age:", ages["Bob"]);
+
+// Add new entry
+ages["David"] = 40;
+print("Map length after adding David:", len(ages));
+print("David's age:", ages["David"]);
+
+// Modify existing entry
+ages["Alice"] = 31;
+print("Alice's new age:", ages["Alice"]);
+
+// Delete entry
+delete(ages, "Bob");
+print("Map length after deleting Bob:", len(ages));

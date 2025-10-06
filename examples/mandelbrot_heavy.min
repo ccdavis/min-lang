@@ -1,0 +1,157 @@
+// Heavy Mandelbrot Benchmark
+// Designed to minimize startup time effects and measure true computational performance
+
+print("=== Heavy Mandelbrot Benchmark ===");
+print("This benchmark is designed to minimize startup time effects");
+print("");
+
+// Test 1: Large resolution, high iteration count
+print("Test 1: 200x200 @ 1000 iterations");
+const WIDTH1: int = 200;
+const HEIGHT1: int = 200;
+const MAX_ITER1: int = 1000;
+
+var totalIterations: int = 0;
+var row: int = 0;
+
+for row < HEIGHT1 {
+    var col: int = 0;
+    for col < WIDTH1 {
+        var cx: float = -2.5 + 3.5 * col / WIDTH1;
+        var cy: float = -1.25 + 2.5 * row / HEIGHT1;
+
+        var x: float = 0.0;
+        var y: float = 0.0;
+        var iter: int = 0;
+
+        for iter < MAX_ITER1 {
+            var x2: float = x * x;
+            var y2: float = y * y;
+
+            if x2 + y2 > 4.0 {
+                break;
+            }
+
+            var xtemp: float = x2 - y2 + cx;
+            y = 2.0 * x * y + cy;
+            x = xtemp;
+
+            iter = iter + 1;
+        }
+
+        totalIterations = totalIterations + iter;
+        col = col + 1;
+    }
+    row = row + 1;
+}
+
+print("Pixels calculated:", WIDTH1 * HEIGHT1);
+print("Total iterations:", totalIterations);
+print("Average iterations per pixel:", totalIterations / (WIDTH1 * HEIGHT1));
+print("");
+
+// Test 2: Very high iteration count (deep zoom)
+print("Test 2: 150x150 @ 2000 iterations (deep zoom)");
+const WIDTH2: int = 150;
+const HEIGHT2: int = 150;
+const MAX_ITER2: int = 2000;
+
+const ZOOM_X: float = -0.5;
+const ZOOM_Y: float = 0.0;
+const ZOOM_SIZE: float = 0.5;
+
+totalIterations = 0;
+row = 0;
+
+for row < HEIGHT2 {
+    var col: int = 0;
+    for col < WIDTH2 {
+        var cx: float = ZOOM_X - ZOOM_SIZE + 2.0 * ZOOM_SIZE * col / WIDTH2;
+        var cy: float = ZOOM_Y - ZOOM_SIZE + 2.0 * ZOOM_SIZE * row / HEIGHT2;
+
+        var x: float = 0.0;
+        var y: float = 0.0;
+        var iter: int = 0;
+
+        for iter < MAX_ITER2 {
+            var x2: float = x * x;
+            var y2: float = y * y;
+
+            if x2 + y2 > 4.0 {
+                break;
+            }
+
+            var xtemp: float = x2 - y2 + cx;
+            y = 2.0 * x * y + cy;
+            x = xtemp;
+
+            iter = iter + 1;
+        }
+
+        totalIterations = totalIterations + iter;
+        col = col + 1;
+    }
+    row = row + 1;
+}
+
+print("Pixels calculated:", WIDTH2 * HEIGHT2);
+print("Total iterations:", totalIterations);
+print("Average iterations per pixel:", totalIterations / (WIDTH2 * HEIGHT2));
+print("");
+
+// Test 3: Multiple medium-resolution renders
+print("Test 3: 30 frames of 100x100 @ 500 iterations");
+const FRAMES: int = 30;
+const FRAME_WIDTH: int = 100;
+const FRAME_HEIGHT: int = 100;
+const FRAME_ITERS: int = 500;
+
+var totalPixels: int = 0;
+totalIterations = 0;
+var frame: int = 0;
+
+for frame < FRAMES {
+    var zoomFactor: float = 1.0 - frame * 0.02;
+
+    row = 0;
+    for row < FRAME_HEIGHT {
+        var col: int = 0;
+        for col < FRAME_WIDTH {
+            var cx: float = -2.0 * zoomFactor + 3.0 * zoomFactor * col / FRAME_WIDTH;
+            var cy: float = -1.0 * zoomFactor + 2.0 * zoomFactor * row / FRAME_HEIGHT;
+
+            var x: float = 0.0;
+            var y: float = 0.0;
+            var iter: int = 0;
+
+            for iter < FRAME_ITERS {
+                var x2: float = x * x;
+                var y2: float = y * y;
+
+                if x2 + y2 > 4.0 {
+                    break;
+                }
+
+                var xtemp: float = x2 - y2 + cx;
+                y = 2.0 * x * y + cy;
+                x = xtemp;
+
+                iter = iter + 1;
+            }
+
+            totalIterations = totalIterations + iter;
+            totalPixels = totalPixels + 1;
+            col = col + 1;
+        }
+        row = row + 1;
+    }
+    frame = frame + 1;
+}
+
+print("Frames calculated:", FRAMES);
+print("Total pixels:", totalPixels);
+print("Total iterations:", totalIterations);
+print("Average iterations per pixel:", totalIterations / totalPixels);
+print("");
+
+print("=== Benchmark Complete ===");

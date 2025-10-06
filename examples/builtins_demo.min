@@ -1,0 +1,49 @@
+// Demonstrate new built-in functions
+
+print("=== keys() and values() for maps ===");
+var scores: map[string]int = map[string]int{
+    "Alice": 95,
+    "Bob": 87,
+    "Charlie": 92
+};
+
+var names = keys(scores);
+print("Number of students:", len(names));
+print("First student name:", names[0]);
+
+var grades = values(scores);
+print("First grade:", grades[0]);
+
+print("");
+print("=== copy() for arrays ===");
+var original: []int = [1, 2, 3, 4, 5];
+var duplicate = copy(original);
+
+print("Original length:", len(original));
+print("Copy length:", len(duplicate));
+print("Original first:", original[0]);
+print("Copy first:", duplicate[0]);
+
+// Modifying copy doesn't affect original
+duplicate[0] = 100;
+print("After modifying copy:");
+print("Original first:", original[0]);
+print("Copy first:", duplicate[0]);
+
+print("");
+print("=== Combining builtins ===");
+var data: map[string]int = map[string]int{
+    "red": 1,
+    "green": 2,
+    "blue": 3
+};
+
+var colors = keys(data);
+print("Colors available:", len(colors));
+
+// Build a new array with colors
+var selected: []string = [];
+for var i: int = 0; i < len(colors); i = i + 1 {
+    selected = append(selected, colors[i]);
+}
+print("Selected colors:", len(selected));

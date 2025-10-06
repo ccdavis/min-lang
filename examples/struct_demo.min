@@ -1,0 +1,30 @@
+// Define struct type
+type Person = struct { name: string, age: int }
+type Employee = struct { name: string, id: int, salary: int }
+
+// Create a struct
+var person = Person{
+    name: "Alice",
+    age: 30
+};
+
+print("Name:", person.name);
+print("Age:", person.age);
+
+// Modify struct fields
+person.age = 31;
+print("Updated age:", person.age);
+
+person.name = "Alice Smith";
+print("Updated name:", person.name);
+
+// Create another struct
+var employee = Employee{
+    name: "Bob",
+    id: 12345,
+    salary: 50000
+};
+
+print("Employee name:", employee.name);
+print("Employee ID:", employee.id);
+print("Employee salary:", employee.salary);

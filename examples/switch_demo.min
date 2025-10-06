@@ -1,0 +1,80 @@
+// Switch statement demonstration
+
+print("=== Integer Switch ===");
+var number: int = 2;
+switch number {
+case 1 {
+    print("Number is one");
+}
+case 2 {
+    print("Number is two");
+}
+case 3 {
+    print("Number is three");
+}
+default {
+    print("Number is something else");
+}
+}
+
+print("");
+print("=== Enum Switch ===");
+type Day = enum { Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday }
+
+var today: int = Wednesday;
+switch today {
+case Monday {
+    print("Start of the work week");
+}
+case Wednesday {
+    print("Midweek!");
+}
+case Friday {
+    print("Almost weekend!");
+}
+case Saturday {
+    print("Weekend time!");
+}
+case Sunday {
+    print("Weekend time!");
+}
+default {
+    print("Regular day");
+}
+}
+
+print("");
+print("=== Switch with Enum Values ===");
+type TrafficLight = enum { Red, Yellow, Green }
+
+var light: int = Red;
+switch light {
+case Red {
+    print("Stop!");
+}
+case Yellow {
+    print("Slow down");
+}
+case Green {
+    print("Go");
+}
+}
+
+print("");
+print("=== Switch in Loop ===");
+for var i: int = 0; i < 5; i = i + 1 {
+    switch i {
+    case 0 {
+        print("i is zero");
+    }
+    case 1 {
+        print("i is one");
+    }
+    case 2 {
+        print("i is two");
+    }
+    default {
+        print("i is", i);
+    }
+    }
+}

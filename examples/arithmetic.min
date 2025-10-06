@@ -1,0 +1,8 @@
+// Simple arithmetic example
+var a: int = 10;
+var b: int = 20;
+var sum: int = a + b;
+var product: int = a * b;
+
+// Result should be 30 + 200 = 230
+sum + product;

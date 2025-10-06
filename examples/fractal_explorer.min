@@ -1,0 +1,239 @@
+// Fractal Explorer - Tests multiple language features
+// Renders different fractal types using structs, enums, and functions
+
+print("=== Fractal Explorer ===");
+print("");
+
+// Define fractal types using enum
+type FractalType = enum { Mandelbrot, Julia, BurningShip }
+
+// Configuration struct
+type Config = struct {
+    width: int,
+    height: int,
+    maxIter: int,
+    xmin: float,
+    xmax: float,
+    ymin: float,
+    ymax: float
+}
+
+// Julia set parameters
+type JuliaParams = struct {
+    cr: float,
+    ci: float
+}
+
+// Color palette for rendering
+func getChar(iter: int, maxIter: int): string {
+    if iter == maxIter {
+        return " ";
+    }
+
+    var ratio: int = iter * 10 / maxIter;
+
+    if ratio == 0 {
+        return "#";
+    }
+    if ratio == 1 {
+        return "@";
+    }
+    if ratio == 2 {
+        return "%";
+    }
+    if ratio == 3 {
+        return "*";
+    }
+    if ratio == 4 {
+        return "+";
+    }
+    if ratio == 5 {
+        return "=";
+    }
+    if ratio == 6 {
+        return "-";
+    }
+    if ratio == 7 {
+        return ":";
+    }
+    if ratio == 8 {
+        return ".";
+    }
+    return " ";
+}
+
+// Mandelbrot set calculation
+func calcMandelbrot(cx: float, cy: float, maxIter: int): int {
+    var x: float = 0.0;
+    var y: float = 0.0;
+    var iter: int = 0;
+
+    for iter < maxIter {
+        var x2: float = x * x;
+        var y2: float = y * y;
+
+        if x2 + y2 > 4.0 {
+            return iter;
+        }
+
+        var xtemp: float = x2 - y2 + cx;
+        y = 2.0 * x * y + cy;
+        x = xtemp;
+
+        iter = iter + 1;
+    }
+
+    return maxIter;
+}
+
+// Julia set calculation
+func calcJulia(zx: float, zy: float, cr: float, ci: float, maxIter: int): int {
+    var x: float = zx;
+    var y: float = zy;
+    var iter: int = 0;
+
+    for iter < maxIter {
+        var x2: float = x * x;
+        var y2: float = y * y;
+
+        if x2 + y2 > 4.0 {
+            return iter;
+        }
+
+        var xtemp: float = x2 - y2 + cr;
+        y = 2.0 * x * y + ci;
+        x = xtemp;
+
+        iter = iter + 1;
+    }
+
+    return maxIter;
+}
+
+// Burning Ship fractal calculation
+func calcBurningShip(cx: float, cy: float, maxIter: int): int {
+    var x: float = 0.0;
+    var y: float = 0.0;
+    var iter: int = 0;
+
+    for iter < maxIter {
+        var x2: float = x * x;
+        var y2: float = y * y;
+
+        if x2 + y2 > 4.0 {
+            return iter;
+        }
+
+        // Absolute values (approximated with conditional)
+        var absX: float = x;
+        var absY: float = y;
+
+        if x < 0.0 {
+            absX = 0.0 - x;
+        }
+        if y < 0.0 {
+            absY = 0.0 - y;
+        }
+
+        var xtemp: float = x2 - y2 + cx;
+        y = 2.0 * absX * absY + cy;
+        x = xtemp;
+
+        iter = iter + 1;
+    }
+
+    return maxIter;
+}
+
+// Render a fractal
+func renderFractal(fractalType: int, config: Config, julia: JuliaParams): int {
+    var pixels: int = 0;
+    var row: int = 0;
+
+    for row < config.height {
+        var line: string = "";
+        var col: int = 0;
+
+        for col < config.width {
+            // Map pixel to complex plane
+            var cx: float = config.xmin + (config.xmax - config.xmin) * col / config.width;
+            var cy: float = config.ymin + (config.ymax - config.ymin) * row / config.height;
+
+            var iter: int = 0;
+
+            // Calculate based on fractal type
+            if fractalType == Mandelbrot {
+                iter = calcMandelbrot(cx, cy, config.maxIter);
+            }
+            if fractalType == Julia {
+                iter = calcJulia(cx, cy, julia.cr, julia.ci, config.maxIter);
+            }
+            if fractalType == BurningShip {
+                iter = calcBurningShip(cx, cy, config.maxIter);
+            }
+
+            var char: string = getChar(iter, config.maxIter);
+            line = line + char;
+            pixels = pixels + 1;
+
+            col = col + 1;
+        }
+
+        print(line);
+        row = row + 1;
+    }
+
+    return pixels;
+}
+
+// Render Mandelbrot Set
+print("1. Mandelbrot Set");
+var mandelbrotConfig = Config{
+    width: 70,
+    height: 30,
+    maxIter: 100,
+    xmin: -2.5,
+    xmax: 1.0,
+    ymin: -1.2,
+    ymax: 1.2
+};
+
+var dummyJulia = JuliaParams{cr: 0.0, ci: 0.0};
+var pixelsRendered: int = renderFractal(Mandelbrot, mandelbrotConfig, dummyJulia);
+print("Rendered", pixelsRendered, "pixels");
+print("");
+
+// Render Julia Set
+print("2. Julia Set (c = -0.7 + 0.27i)");
+var juliaConfig = Config{
+    width: 70,
+    height: 30,
+    maxIter: 100,
+    xmin: -1.5,
+    xmax: 1.5,
+    ymin: -1.2,
+    ymax: 1.2
+};
+
+var juliaParams = JuliaParams{cr: -0.7, ci: 0.27};
+pixelsRendered = renderFractal(Julia, juliaConfig, juliaParams);
+print("Rendered", pixelsRendered, "pixels");
+print("");
+
+// Render Burning Ship
+print("3. Burning Ship Fractal");
+var shipConfig = Config{
+    width: 70,
+    height: 30,
+    maxIter: 100,
+    xmin: -2.0,
+    xmax: 1.0,
+    ymin: -1.2,
+    ymax: 1.2
+};
+
+pixelsRendered = renderFractal(BurningShip, shipConfig, dummyJulia);
+print("Rendered", pixelsRendered, "pixels");
+print("");
+
+print("=== Exploration Complete ===");

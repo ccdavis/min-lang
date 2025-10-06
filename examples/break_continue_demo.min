@@ -1,0 +1,48 @@
+// Demonstrate break and continue
+
+print("=== Break Example ===");
+var sum1: int = 0;
+for var i: int = 1; i <= 100; i = i + 1 {
+    if i > 10 {
+        break;  // Stop when i > 10
+    }
+    sum1 = sum1 + i;
+}
+print("Sum of 1-10:", sum1);
+
+print("");
+print("=== Continue Example ===");
+var sum2: int = 0;
+for var j: int = 1; j <= 10; j = j + 1 {
+    if j % 2 == 0 {
+        continue;  // Skip even numbers
+    }
+    sum2 = sum2 + j;
+}
+print("Sum of odd numbers 1-10:", sum2);
+
+print("");
+print("=== Both Together ===");
+var sum3: int = 0;
+for var k: int = 1; k <= 50; k = k + 1 {
+    if k > 20 {
+        break;  // Stop at 20
+    }
+    if k % 3 == 0 {
+        continue;  // Skip multiples of 3
+    }
+    sum3 = sum3 + k;
+}
+print("Sum (1-20, skip mult of 3):", sum3);
+
+print("");
+print("=== Finding First Match ===");
+var numbers: []int = [2, 4, 6, 7, 8, 10, 12];
+var firstOdd: int = -1;
+for var idx: int = 0; idx < len(numbers); idx = idx + 1 {
+    if numbers[idx] % 2 != 0 {
+        firstOdd = numbers[idx];
+        break;  // Found it, exit loop
+    }
+}
+print("First odd number:", firstOdd);

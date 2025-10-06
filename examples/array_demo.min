@@ -1,0 +1,17 @@
+// Create an array
+var nums: []int = [1, 2, 3, 4, 5];
+
+print("Array length:", len(nums));
+print("First element:", nums[0]);
+print("Last element:", nums[4]);
+
+// Modify array elements
+nums[2] = 10;
+print("Modified third element:", nums[2]);
+
+// Sum array elements
+var sum: int = 0;
+for var i: int = 0; i < len(nums); i = i + 1 {
+    sum = sum + nums[i];
+}
+print("Sum of array:", sum);

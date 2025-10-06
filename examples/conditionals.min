@@ -1,0 +1,11 @@
+// Conditional example
+var x: int = 5;
+var result: int = 0;
+
+if x > 3 {
+	result = 100;
+} else {
+	result = 50;
+}
+
+result;

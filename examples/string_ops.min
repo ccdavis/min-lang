@@ -1,0 +1,38 @@
+// Demonstrate string operations
+
+// String concatenation
+var first: string = "Hello";
+var last: string = "World";
+var greeting = first + ", " + last + "!";
+print(greeting);
+
+// String with numbers
+var name: string = "Alice";
+var age: int = 30;
+var message = name + " is " + age + " years old";
+print(message);
+
+// String indexing
+var word: string = "Hello";
+print("First character:", word[0]);
+print("Last character:", word[4]);
+
+// String length
+print("Length of 'Hello':", len(word));
+
+// Building strings
+var result: string = "";
+result = result + "P";
+result = result + "r";
+result = result + "o";
+result = result + "g";
+result = result + "r";
+result = result + "a";
+result = result + "m";
+print("Built string:", result);
+
+// Using strings in loops
+var alphabet: string = "abcdefghijklmnopqrstuvwxyz";
+print("Alphabet length:", len(alphabet));
+print("First letter:", alphabet[0]);
+print("Last letter:", alphabet[25]);

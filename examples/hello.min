@@ -1,0 +1,5 @@
+// Hello World example
+func main() {
+	var message: string = "Hello, MinLang!";
+	print(message);
+}

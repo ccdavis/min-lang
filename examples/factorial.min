@@ -1,0 +1,11 @@
+// Factorial example with recursion
+func factorial(n: int): int {
+	if n < 2 {
+		return 1;
+	}
+	return n * factorial(n - 1);
+}
+
+// Test factorial
+var result: int = factorial(5);
+result;

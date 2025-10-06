@@ -1,0 +1,22 @@
+// Demonstrate const variables
+
+const PI: float = 3.14159;
+const MAX_SIZE: int = 100;
+
+print("PI:", PI);
+print("MAX_SIZE:", MAX_SIZE);
+
+// This would cause a compilation error:
+// PI = 3.14;  // Error: cannot assign to const variable PI
+
+// Const can be used in calculations
+var radius: int = 5;
+var area: float = PI * radius * radius;
+print("Area of circle with radius", radius, "is", area);
+
+// Using const in loops
+var sum: int = 0;
+for var i: int = 0; i < MAX_SIZE; i = i + 1 {
+    sum = sum + i;
+}
+print("Sum from 0 to", MAX_SIZE - 1, "is", sum);

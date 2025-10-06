@@ -1,0 +1,37 @@
+var total: int = 0;
+var row: int = 0;
+
+for row < 20 {
+    var col: int = 0;
+    for col < 20 {
+        var cx: float = -2.0 + 4.0 * col / 20.0;
+        var cy: float = -2.0 + 4.0 * row / 20.0;
+
+        var x: float = 0.0;
+        var y: float = 0.0;
+        var iter: int = 0;
+
+        for iter < 100 {
+            var x2: float = x * x;
+            var y2: float = y * y;
+
+            if x2 + y2 > 4.0 {
+                break;
+            }
+
+            var xtemp: float = x2 - y2 + cx;
+            y = 2.0 * x * y + cy;
+            x = xtemp;
+
+            iter = iter + 1;
+        }
+
+        total = total + iter;
+        col = col + 1;
+    }
+    print(row);
+    row = row + 1;
+}
+
+print("Total:");
+print(total);

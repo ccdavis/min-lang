@@ -1,0 +1,16 @@
+// Simple enum demonstration
+
+type Color = enum { Red, Green, Blue }
+
+print("Red value:", Red);
+print("Green value:", Green);
+print("Blue value:", Blue);
+
+var colorName = enumName("Color", Red);
+print("Red name:", colorName);
+
+var greenVal = enumValue("Color", "Green");
+print("Green value from string:", greenVal);
+
+var current: int = Blue;
+print("Current color value:", current);
