@@ -21,8 +21,19 @@ type EnumType struct {
 
 // StructType tracks struct type information
 type StructType struct {
-	Name   string
-	Fields map[string]string // field name -> field type
+	Name       string
+	Fields     map[string]string // field name -> field type
+	FieldOrder []string          // ordered field names (Phase 3: for offset-based access)
+}
+
+// GetFieldOffset returns the offset (index) of a field, or -1 if not found
+func (st *StructType) GetFieldOffset(fieldName string) int {
+	for i, name := range st.FieldOrder {
+		if name == fieldName {
+			return i
+		}
+	}
+	return -1
 }
 
 // Compiler represents the compiler
@@ -478,7 +489,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		case *ast.FieldAccessExpression:
 			// For struct.field = value
-			// Stack layout: struct, fieldName, value
+			// Stack layout: struct, [fieldName], value (or struct, value with offset)
 
 			// Compile the struct
 			err := c.Compile(left.Left)
@@ -486,8 +497,28 @@ func (c *Compiler) Compile(node ast.Node) error {
 				return err
 			}
 
-			// Push field name
-			c.emit(vm.OpPush, c.addConstant(vm.StringValue(left.Field.Value)))
+			// Phase 3 optimization: Use offset-based field access if possible
+			var structTypeName string
+			if structLit, ok := left.Left.(*ast.StructLiteral); ok {
+				structTypeName = structLit.Name.Value
+			}
+
+			// Try offset-based access
+			useOffset := false
+			var offset int
+			if structTypeName != "" {
+				if structType, ok := c.structTypes[structTypeName]; ok {
+					offset = structType.GetFieldOffset(left.Field.Value)
+					if offset >= 0 {
+						useOffset = true
+					}
+				}
+			}
+
+			if !useOffset {
+				// Push field name for name-based access
+				c.emit(vm.OpPush, c.addConstant(vm.StringValue(left.Field.Value)))
+			}
 
 			// Compile the value
 			err = c.Compile(node.Value)
@@ -496,7 +527,11 @@ func (c *Compiler) Compile(node ast.Node) error {
 			}
 
 			// Emit set field operation
-			c.emit(vm.OpSetField)
+			if useOffset {
+				c.emit(vm.OpSetFieldOffset, offset)
+			} else {
+				c.emit(vm.OpSetField)
+			}
 
 		default:
 			return fmt.Errorf("unsupported assignment target")
@@ -515,13 +550,15 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 			// Register struct type
 			structType := &StructType{
-				Name:   node.Name.Value,
-				Fields: make(map[string]string),
+				Name:       node.Name.Value,
+				Fields:     make(map[string]string),
+				FieldOrder: make([]string, 0, len(def.Fields)),
 			}
 
-			// Store field types
+			// Store field types and order (Phase 3: for offset-based access)
 			for _, field := range def.Fields {
 				structType.Fields[field.Name.Value] = field.Type.String()
+				structType.FieldOrder = append(structType.FieldOrder, field.Name.Value)
 			}
 
 			c.structTypes[node.Name.Value] = structType
@@ -693,22 +730,48 @@ func (c *Compiler) Compile(node ast.Node) error {
 		c.emit(vm.OpMap, len(node.Pairs))
 
 	case *ast.StructLiteral:
-		// Compile each field first (they'll be popped in reverse order)
-		for fieldName, value := range node.Fields {
-			// Push field name
-			c.emit(vm.OpPush, c.addConstant(vm.StringValue(fieldName)))
-			// Push field value
-			err := c.Compile(value)
-			if err != nil {
-				return err
+		// Phase 3 optimization: Use offset-based struct creation if type is known
+		if structType, ok := c.structTypes[node.Name.Value]; ok {
+			// We know the struct type - use ordered creation
+			// Compile fields in the correct order, with field names
+			for _, fieldName := range structType.FieldOrder {
+				value, exists := node.Fields[fieldName]
+				if !exists {
+					return fmt.Errorf("missing required field %s in struct %s", fieldName, node.Name.Value)
+				}
+				// Push field name first
+				c.emit(vm.OpPush, c.addConstant(vm.StringValue(fieldName)))
+				// Then field value
+				err := c.Compile(value)
+				if err != nil {
+					return err
+				}
 			}
+
+			// Push the type name as a string (last, will be popped first)
+			c.emit(vm.OpPush, c.addConstant(vm.StringValue(node.Name.Value)))
+
+			// Emit OpStructOrdered with number of fields
+			c.emit(vm.OpStructOrdered, len(node.Fields))
+		} else {
+			// Fallback to name-based struct creation (for unknown types)
+			// Compile each field first (they'll be popped in reverse order)
+			for fieldName, value := range node.Fields {
+				// Push field name
+				c.emit(vm.OpPush, c.addConstant(vm.StringValue(fieldName)))
+				// Push field value
+				err := c.Compile(value)
+				if err != nil {
+					return err
+				}
+			}
+
+			// Push the type name as a string (last, will be popped first)
+			c.emit(vm.OpPush, c.addConstant(vm.StringValue(node.Name.Value)))
+
+			// Emit OpStruct with number of fields
+			c.emit(vm.OpStruct, len(node.Fields))
 		}
-
-		// Push the type name as a string (last, will be popped first)
-		c.emit(vm.OpPush, c.addConstant(vm.StringValue(node.Name.Value)))
-
-		// Emit OpStruct with number of fields
-		c.emit(vm.OpStruct, len(node.Fields))
 
 	case *ast.IndexExpression:
 		// Compile the array/map expression
@@ -734,10 +797,35 @@ func (c *Compiler) Compile(node ast.Node) error {
 			return err
 		}
 
-		// Push the field name as a string
-		c.emit(vm.OpPush, c.addConstant(vm.StringValue(node.Field.Value)))
+		// Phase 3 optimization: Use offset-based field access if possible
+		// Try to determine the struct type from the left expression
+		var structTypeName string
+		if ident, ok := node.Left.(*ast.Identifier); ok {
+			// Check if this is a known variable with struct type
+			if varType, exists := c.varTypes[ident.Value]; exists && varType == vm.StructType {
+				// We'd need more detailed type tracking to know which struct type
+				// For now, fall through to name-based access
+			}
+		}
+		// Check if left is a struct literal - we know the type directly
+		if structLit, ok := node.Left.(*ast.StructLiteral); ok {
+			structTypeName = structLit.Name.Value
+		}
 
-		// Emit get field operation
+		// If we know the struct type, use offset-based access
+		if structTypeName != "" {
+			if structType, ok := c.structTypes[structTypeName]; ok {
+				offset := structType.GetFieldOffset(node.Field.Value)
+				if offset >= 0 {
+					// Use offset-based access - much faster!
+					c.emit(vm.OpGetFieldOffset, offset)
+					return nil
+				}
+			}
+		}
+
+		// Fallback to name-based access
+		c.emit(vm.OpPush, c.addConstant(vm.StringValue(node.Field.Value)))
 		c.emit(vm.OpGetField)
 
 	case *ast.SwitchStatement:

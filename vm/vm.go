@@ -863,6 +863,81 @@ func (vm *VM) Run() error {
 
 				structData.Fields[fieldName] = value
 
+			// Phase 3 optimization: Offset-based struct operations
+			case OpStructOrdered:
+				numFields, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				typeNameVal := vm.pop()
+				if typeNameVal.Type != StringType {
+					return fmt.Errorf("struct type name must be string")
+				}
+
+				// Pop fields in reverse order (name, value pairs were pushed in correct order)
+				fieldNames := make([]string, numFields)
+				fieldValues := make([]Value, numFields)
+				for i := numFields - 1; i >= 0; i-- {
+					fieldValues[i] = vm.pop()
+					fieldName := vm.pop()
+					if fieldName.Type != StringType {
+						return fmt.Errorf("struct field name must be string")
+					}
+					fieldNames[i] = fieldName.AsString()
+				}
+
+				// Create struct with ordered fields (Phase 3 optimization)
+				// This populates both FieldsArray (for fast offset access) and
+				// Fields map (for backward compatibility)
+				structVal := NewStructValueOrdered(typeNameVal.AsString(), fieldNames, fieldValues)
+
+				err := vm.push(structVal)
+				if err != nil {
+					return err
+				}
+
+			case OpGetFieldOffset:
+				offset, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				structVal := vm.pop()
+
+				if structVal.Type != StructType {
+					return fmt.Errorf("field access not supported for type %d", structVal.Type)
+				}
+
+				structData := structVal.AsStruct()
+
+				// Direct array access - no map lookup! (Phase 3 optimization)
+				if offset < 0 || offset >= len(structData.FieldsArray) {
+					return fmt.Errorf("field offset %d out of bounds", offset)
+				}
+
+				value := structData.FieldsArray[offset]
+				err := vm.push(value)
+				if err != nil {
+					return err
+				}
+
+			case OpSetFieldOffset:
+				offset, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				value := vm.pop()
+				structVal := vm.pop()
+
+				if structVal.Type != StructType {
+					return fmt.Errorf("field access not supported for type %d", structVal.Type)
+				}
+
+				structData := structVal.AsStruct()
+
+				// Direct array access - no map lookup! (Phase 3 optimization)
+				if offset < 0 || offset >= len(structData.FieldsArray) {
+					return fmt.Errorf("field offset %d out of bounds", offset)
+				}
+
+				structData.FieldsArray[offset] = value
+
 			case OpPrint:
 				val := vm.pop()
 				fmt.Println(val.String())

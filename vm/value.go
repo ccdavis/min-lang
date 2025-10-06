@@ -200,14 +200,39 @@ func (v Value) ToMapKey() MapKey {
 
 // StructValue represents a struct instance
 type StructValue struct {
-	TypeName string
-	Fields   map[string]Value
+	TypeName    string
+	Fields      map[string]Value // For name-based access (backward compatibility)
+	FieldsArray []Value          // For offset-based access (Phase 3 optimization)
+	FieldOrder  []string         // Field names in order (for debugging/printing)
 }
 
 func NewStructValue(typeName string, fields map[string]Value) Value {
 	s := &StructValue{
 		TypeName: typeName,
 		Fields:   fields,
+	}
+	// Add to pool to keep it alive for GC
+	structPool = append(structPool, s)
+	return Value{
+		Type: StructType,
+		Data: uint64(uintptr(unsafe.Pointer(s))),
+	}
+}
+
+// NewStructValueOrdered creates a struct with ordered fields (Phase 3 optimization)
+// This enables fast offset-based field access
+func NewStructValueOrdered(typeName string, fieldNames []string, fieldValues []Value) Value {
+	// Create map for backward compatibility
+	fields := make(map[string]Value, len(fieldNames))
+	for i, name := range fieldNames {
+		fields[name] = fieldValues[i]
+	}
+
+	s := &StructValue{
+		TypeName:    typeName,
+		Fields:      fields,
+		FieldsArray: fieldValues,
+		FieldOrder:  fieldNames,
 	}
 	// Add to pool to keep it alive for GC
 	structPool = append(structPool, s)

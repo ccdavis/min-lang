@@ -97,9 +97,14 @@ const (
 	OpMapSet    // Set map value
 
 	// Struct operations
-	OpStruct     // Create struct
-	OpGetField   // Get struct field
-	OpSetField   // Set struct field
+	OpStruct     // Create struct (with name-based fields)
+	OpGetField   // Get struct field (by name)
+	OpSetField   // Set struct field (by name)
+
+	// Struct operations (Phase 3 optimization - offset-based access)
+	OpStructOrdered  // Create struct with ordered fields (faster creation)
+	OpGetFieldOffset // Get struct field by offset (no map lookup!)
+	OpSetFieldOffset // Set struct field by offset (no map lookup!)
 
 	// Special operations
 	OpHalt       // Halt execution
@@ -251,6 +256,12 @@ func (op OpCode) String() string {
 		return "GET_FIELD"
 	case OpSetField:
 		return "SET_FIELD"
+	case OpStructOrdered:
+		return "STRUCT_ORDERED"
+	case OpGetFieldOffset:
+		return "GET_FIELD_OFFSET"
+	case OpSetFieldOffset:
+		return "SET_FIELD_OFFSET"
 	case OpHalt:
 		return "HALT"
 	case OpPrint:
