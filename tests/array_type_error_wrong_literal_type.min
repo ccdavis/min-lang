@@ -1,0 +1,6 @@
+// Test: Wrong type in array literal - should fail
+// Array is declared as []int but literal contains string
+
+var nums: []int = [1, 2, "three", 4, 5];
+
+print(nums[0]);

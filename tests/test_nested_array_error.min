@@ -1,0 +1,5 @@
+// This should fail: trying to put string in nested int array
+var matrix: [][]int = [
+    [1, 2, 3],
+    [4, "five", 6]
+];

@@ -1,0 +1,43 @@
+// Demonstration of type checking for arrays and maps
+
+// Valid array declarations and operations
+var intArray: []int = [1, 2, 3, 4, 5];
+print("Int array:", intArray[0], intArray[1], intArray[2]);
+
+var stringArray: []string = ["hello", "world"];
+print("String array:", stringArray[0], stringArray[1]);
+
+// Valid map declarations and operations
+var ages: map[string]int = map[string]int{
+    "Alice": 30,
+    "Bob": 25
+};
+print("Ages - Alice:", ages["Alice"], "Bob:", ages["Bob"]);
+
+var ids: map[int]string = map[int]string{
+    1: "First",
+    2: "Second"
+};
+print("IDs - 1:", ids[1], "2:", ids[2]);
+
+// Valid modifications
+intArray[0] = 100;
+print("Modified int array:", intArray[0]);
+
+stringArray[0] = "goodbye";
+print("Modified string array:", stringArray[0]);
+
+ages["Charlie"] = 35;
+print("Added Charlie:", ages["Charlie"]);
+
+ids[3] = "Third";
+print("Added ID 3:", ids[3]);
+
+print("\n=== Type checking works correctly! ===");
+
+// The following would cause compilation errors:
+// var badArray: []int = [1, 2, "three"];  // Error: string in int array
+// var badMap: map[string]int = map[string]int{"key": "value"};  // Error: string value instead of int
+// intArray[0] = "string";  // Error: assigning string to int array
+// ages[123] = 30;  // Error: using int key on string-keyed map
+// ages["Bob"] = "thirty";  // Error: assigning string to int value

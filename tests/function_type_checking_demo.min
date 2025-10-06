@@ -1,0 +1,65 @@
+// Demonstration of compile-time function type checking
+
+// Test 1: Valid function with explicit types
+func add(x: int, y: int): int {
+    return x + y;
+}
+
+print("Test 1 - add(5, 3):", add(5, 3));
+
+// Test 2: Function with string parameters and return
+func greet(name: string): string {
+    return "Hello, " + name;
+}
+
+print("Test 2 - greet:", greet("World"));
+
+// Test 3: Function with multiple types
+func calculate(a: int, b: float, c: bool): int {
+    if c {
+        return a + 10;
+    }
+    return a;
+}
+
+print("Test 3 - calculate:", calculate(5, 2.5, true));
+
+// Test 4: Recursive function with type checking
+func factorial(n: int): int {
+    if n <= 1 {
+        return 1;
+    }
+    return n * factorial(n - 1);
+}
+
+print("Test 4 - factorial(5):", factorial(5));
+
+// Test 5: Functions that return arrays and maps
+func makeArray(): []int {
+    return [1, 2, 3, 4, 5];
+}
+
+func makeMap(): map[string]int {
+    return map[string]int{"a": 1, "b": 2};
+}
+
+var arr: []int = makeArray();
+print("Test 5a - array from function:", arr[0], arr[1], arr[2]);
+
+var m: map[string]int = makeMap();
+print("Test 5b - map from function:", m["a"], m["b"]);
+
+// Test 6: Void function (no return type)
+func printMessage() {
+    print("This function has no return type");
+}
+
+printMessage();
+
+print("\n=== All function type checks passed! ===");
+
+// The following would cause COMPILATION ERRORS:
+// add(5);                        // Wrong arg count
+// add(5, "hello");               // Wrong arg type
+// greet(123);                    // Wrong arg type
+// var badFunc(): string { return 123; }  // Wrong return type

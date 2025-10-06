@@ -1,0 +1,86 @@
+// Comprehensive type checking test
+
+print("=== Testing Array Type Checking ===");
+
+// Valid int array
+var nums: []int = [1, 2, 3, 4, 5];
+print("Int array created:", nums[0], nums[1], nums[2]);
+nums[0] = 100;
+print("Modified nums[0]:", nums[0]);
+
+// Valid string array
+var words: []string = ["hello", "world", "test"];
+print("String array created:", words[0], words[1]);
+words[1] = "universe";
+print("Modified words[1]:", words[1]);
+
+// Valid float array
+var prices: []float = [1.5, 2.5, 3.5];
+print("Float array created:", prices[0], prices[1]);
+prices[2] = 4.5;
+print("Modified prices[2]:", prices[2]);
+
+// Valid nested array
+var matrix: [][]int = [[1, 2], [3, 4]];
+print("Nested array created:", matrix[0][0], matrix[1][1]);
+matrix[0][1] = 20;
+print("Modified matrix[0][1]:", matrix[0][1]);
+
+print("\n=== Testing Map Type Checking ===");
+
+// Valid string->int map
+var ages: map[string]int = map[string]int{
+    "Alice": 30,
+    "Bob": 25
+};
+print("String->int map created - Alice:", ages["Alice"], "Bob:", ages["Bob"]);
+ages["Charlie"] = 35;
+print("Added Charlie:", ages["Charlie"]);
+ages["Alice"] = 31;
+print("Modified Alice:", ages["Alice"]);
+
+// Valid int->string map
+var names: map[int]string = map[int]string{
+    1: "First",
+    2: "Second"
+};
+print("Int->string map created - 1:", names[1], "2:", names[2]);
+names[3] = "Third";
+print("Added 3:", names[3]);
+
+// Valid string->string map
+var capitals: map[string]string = map[string]string{
+    "USA": "Washington",
+    "France": "Paris"
+};
+print("String->string map created - USA:", capitals["USA"]);
+capitals["Germany"] = "Berlin";
+print("Added Germany:", capitals["Germany"]);
+
+// Valid int->int map
+var squares: map[int]int = map[int]int{
+    1: 1,
+    2: 4,
+    3: 9
+};
+print("Int->int map created - 2:", squares[2], "3:", squares[3]);
+squares[4] = 16;
+print("Added 4:", squares[4]);
+
+print("\n=== All type checks passed! ===");
+
+// The following would all cause compilation errors:
+// var badArray1: []int = [1, 2, "three"];  // string in int array
+// var badArray2: []string = ["hello", 123];  // int in string array
+// nums[0] = "string";  // assigning string to int array element
+// words[0] = 123;  // assigning int to string array element
+//
+// var badMap1: map[string]int = map[string]int{"key": "value"};  // string value instead of int
+// var badMap2: map[int]string = map[int]string{"key": "value"};  // string key instead of int
+// ages["key"] = "value";  // string value instead of int
+// ages[123] = 30;  // int key instead of string
+// names["key"] = "value";  // string key instead of int
+// names[1] = 123;  // int value instead of string
+//
+// var badNested: [][]int = [[1, 2], [3, "four"]];  // string in nested int array
+// matrix[0][0] = "string";  // assigning string to nested int array element

@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"fmt"
 	"minlang/ast"
 	"minlang/vm"
 )
@@ -176,4 +177,164 @@ func (c *Compiler) getOperandTypes(node *ast.InfixExpression) (vm.ValueType, vm.
 	leftType := c.inferExpressionType(node.Left)
 	rightType := c.inferExpressionType(node.Right)
 	return leftType, rightType
+}
+
+// inferDetailedType infers the detailed Type (not just vm.ValueType) of an expression
+// This is used for type checking
+func (c *Compiler) inferDetailedType(node ast.Expression) Type {
+	switch n := node.(type) {
+	case *ast.IntegerLiteral:
+		return IntType
+
+	case *ast.FloatLiteral:
+		return FloatType
+
+	case *ast.BooleanLiteral:
+		return BoolType
+
+	case *ast.StringLiteral:
+		return StringType
+
+	case *ast.NilLiteral:
+		return NilType
+
+	case *ast.Identifier:
+		// Check if we have detailed type information
+		if t, ok := c.typeInfo[n.Value]; ok {
+			return t
+		}
+		return AnyTypeVal
+
+	case *ast.ArrayLiteral:
+		if len(n.Elements) == 0 {
+			return &ArrayType{ElementType: AnyTypeVal}
+		}
+		// Infer element type from first element
+		elemType := c.inferDetailedType(n.Elements[0])
+		return &ArrayType{ElementType: elemType}
+
+	case *ast.MapLiteral:
+		if len(n.Pairs) == 0 {
+			return &MapType{KeyType: AnyTypeVal, ValueType: AnyTypeVal}
+		}
+		// Infer key and value types from first pair
+		var firstKey ast.Expression
+		var firstValue ast.Expression
+		for k, v := range n.Pairs {
+			firstKey = k
+			firstValue = v
+			break
+		}
+		keyType := c.inferDetailedType(firstKey)
+		valueType := c.inferDetailedType(firstValue)
+		return &MapType{KeyType: keyType, ValueType: valueType}
+
+	case *ast.InfixExpression:
+		leftType := c.inferDetailedType(n.Left)
+		rightType := c.inferDetailedType(n.Right)
+
+		switch n.Operator {
+		case "+":
+			// String concatenation
+			if leftType.Equals(StringType) || rightType.Equals(StringType) {
+				return StringType
+			}
+			// Float promotion
+			if leftType.Equals(FloatType) || rightType.Equals(FloatType) {
+				return FloatType
+			}
+			return IntType
+
+		case "-", "*", "/", "%":
+			if leftType.Equals(FloatType) || rightType.Equals(FloatType) {
+				return FloatType
+			}
+			return IntType
+
+		case "==", "!=", "<", ">", "<=", ">=":
+			return BoolType
+
+		case "&&", "||":
+			return BoolType
+
+		default:
+			return AnyTypeVal
+		}
+
+	case *ast.PrefixExpression:
+		switch n.Operator {
+		case "!":
+			return BoolType
+		case "-":
+			operand := c.inferDetailedType(n.Right)
+			return operand
+		}
+
+	case *ast.IndexExpression:
+		containerType := c.inferDetailedType(n.Left)
+		if arrayType, ok := containerType.(*ArrayType); ok {
+			return arrayType.ElementType
+		}
+		if mapType, ok := containerType.(*MapType); ok {
+			return mapType.ValueType
+		}
+		if containerType.Equals(StringType) {
+			return StringType
+		}
+		return AnyTypeVal
+
+	case *ast.CallExpression:
+		// For now, return AnyTypeVal for function calls
+		// Would need to track function return types
+		return AnyTypeVal
+	}
+
+	return AnyTypeVal
+}
+
+// checkValueType performs deep type checking for a value against an expected type
+func (c *Compiler) checkValueType(node ast.Expression, expectedType Type) error {
+	// Check array literals
+	if arrLit, ok := node.(*ast.ArrayLiteral); ok {
+		if arrType, ok := expectedType.(*ArrayType); ok {
+			// Check each element recursively
+			for i, elem := range arrLit.Elements {
+				// Recursively check if element itself is an array or map
+				if err := c.checkValueType(elem, arrType.ElementType); err != nil {
+					return fmt.Errorf("array element %d: %v", i, err)
+				}
+			}
+			return nil
+		}
+	}
+
+	// Check map literals
+	if mapLit, ok := node.(*ast.MapLiteral); ok {
+		if mapType, ok := expectedType.(*MapType); ok {
+			// Check each key-value pair
+			for key, value := range mapLit.Pairs {
+				keyType := c.inferDetailedType(key)
+				if !IsAssignableTo(keyType, mapType.KeyType) {
+					return fmt.Errorf("map key has type %s, expected %s",
+						keyType.String(), mapType.KeyType.String())
+				}
+
+				valueType := c.inferDetailedType(value)
+				if !IsAssignableTo(valueType, mapType.ValueType) {
+					return fmt.Errorf("map value has type %s, expected %s",
+						valueType.String(), mapType.ValueType.String())
+				}
+			}
+			return nil
+		}
+	}
+
+	// For other expressions, check basic type compatibility
+	valueType := c.inferDetailedType(node)
+	if !IsAssignableTo(valueType, expectedType) {
+		return fmt.Errorf("cannot assign value of type %s to type %s",
+			valueType.String(), expectedType.String())
+	}
+
+	return nil
 }

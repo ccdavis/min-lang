@@ -1,0 +1,70 @@
+// Benchmark focused on arrays, maps, and functions
+// These operations benefit most from our type checking optimizations
+
+print("=== Array, Map, and Function Benchmark ===");
+
+// Test 1: Heavy array usage
+func processArray(arr: []int): int {
+    var sum: int = 0;
+    for var i: int = 0; i < len(arr); i = i + 1 {
+        sum = sum + arr[i] * 2;
+        arr[i] = arr[i] + 1;
+    }
+    return sum;
+}
+
+var testArray: []int = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+var arraySum: int = 0;
+
+for var iter: int = 0; iter < 50000; iter = iter + 1 {
+    arraySum = arraySum + processArray(testArray);
+}
+
+print("Array operations completed, sum:", arraySum);
+
+// Test 2: Heavy map usage
+func processMap(m: map[int]int): int {
+    var sum: int = 0;
+    sum = sum + m[1] + m[2] + m[3] + m[4] + m[5];
+    m[1] = m[1] + 1;
+    m[2] = m[2] + 1;
+    m[3] = m[3] + 1;
+    return sum;
+}
+
+var testMap: map[int]int = map[int]int{
+    1: 10,
+    2: 20,
+    3: 30,
+    4: 40,
+    5: 50
+};
+
+var mapSum: int = 0;
+for var iter: int = 0; iter < 50000; iter = iter + 1 {
+    mapSum = mapSum + processMap(testMap);
+}
+
+print("Map operations completed, sum:", mapSum);
+
+// Test 3: Heavy function calls with type checking
+func add(x: int, y: int): int {
+    return x + y;
+}
+
+func multiply(x: int, y: int): int {
+    return x * y;
+}
+
+func compute(a: int, b: int, c: int): int {
+    return add(a, b) + multiply(b, c);
+}
+
+var funcSum: int = 0;
+for var iter: int = 0; iter < 100000; iter = iter + 1 {
+    funcSum = funcSum + compute(iter % 10, iter % 7, iter % 5);
+}
+
+print("Function call operations completed, sum:", funcSum);
+
+print("\n=== Benchmark Complete ===");

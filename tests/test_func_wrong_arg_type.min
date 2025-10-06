@@ -1,0 +1,7 @@
+// Test: Wrong argument type
+func add(x: int, y: int): int {
+    return x + y;
+}
+
+// This should fail - passing string instead of int
+print(add(5, "hello"));

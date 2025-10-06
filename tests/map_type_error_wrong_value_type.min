@@ -1,0 +1,10 @@
+// Test: Using wrong value type - should fail
+// Map is declared as map[string]int but we try to assign a string value
+
+var ages: map[string]int = map[string]int{
+    "Alice": 30,
+    "Bob": 25
+};
+
+// This should fail - trying to assign string value to int-valued map
+ages["Charlie"] = "thirty";

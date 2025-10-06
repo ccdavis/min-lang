@@ -1,0 +1,2 @@
+// This should fail: trying to mix int and string in array literal
+var mixed: []int = [1, 2, "three", 4];

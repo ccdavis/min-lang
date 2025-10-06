@@ -1,0 +1,11 @@
+// Test: Using wrong key type - should fail
+// Map is declared as map[int]string but we try to use a string as key
+
+var names: map[int]string = map[int]string{
+    1: "Alice",
+    2: "Bob"
+};
+
+// This should fail - trying to use string key on int-keyed map
+var wrongKey: string = "key";
+print(names[wrongKey]);

@@ -1,0 +1,7 @@
+// Test: Using wrong element type in array - should fail
+// Array is declared as []int but we try to assign a string
+
+var nums: []int = [1, 2, 3, 4, 5];
+
+// This should fail - trying to assign string to int array
+nums[2] = "hello";

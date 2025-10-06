@@ -1,0 +1,7 @@
+// Test: Wrong number of arguments
+func add(x: int, y: int): int {
+    return x + y;
+}
+
+// This should fail - need 2 args but passing 1
+print(add(5));

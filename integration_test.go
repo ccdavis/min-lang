@@ -294,6 +294,97 @@ arr[1] = 10
 print(arr[1])`,
 			"10\n",
 		},
+		{
+			"MapStringIntBasic",
+			`var ages: map[string]int = map[string]int{"Alice": 30, "Bob": 25}
+print(ages["Alice"])
+print(len(ages))`,
+			"30\n2\n",
+		},
+		{
+			"MapAddEntry",
+			`var ages: map[string]int = map[string]int{"Alice": 30}
+ages["Bob"] = 25
+print(ages["Bob"])
+print(len(ages))`,
+			"25\n2\n",
+		},
+		{
+			"MapModifyEntry",
+			`var ages: map[string]int = map[string]int{"Alice": 30}
+ages["Alice"] = 31
+print(ages["Alice"])`,
+			"31\n",
+		},
+		{
+			"MapIntStringBasic",
+			`var names: map[int]string = map[int]string{1: "First", 2: "Second"}
+print(names[1])
+print(names[2])`,
+			"First\nSecond\n",
+		},
+		{
+			"MapIntStringAdd",
+			`var names: map[int]string = map[int]string{1: "First"}
+names[2] = "Second"
+print(names[2])
+print(len(names))`,
+			"Second\n2\n",
+		},
+		{
+			"MapDelete",
+			`var ages: map[string]int = map[string]int{"Alice": 30, "Bob": 25}
+delete(ages, "Alice")
+print(len(ages))`,
+			"1\n",
+		},
+		{
+			"ArrayStringBasic",
+			`var fruits: []string = ["apple", "banana", "cherry"]
+print(fruits[0])
+print(fruits[1])
+print(fruits[2])`,
+			"apple\nbanana\ncherry\n",
+		},
+		{
+			"ArrayFloatBasic",
+			`var prices: []float = [1.5, 2.5, 3.5]
+print(prices[0])
+print(prices[2])`,
+			"1.500000\n3.500000\n",
+		},
+		{
+			"ArrayBoolBasic",
+			`var flags: []bool = [true, false, true]
+print(flags[0])
+print(flags[1])
+print(flags[2])`,
+			"true\nfalse\ntrue\n",
+		},
+		{
+			"ArrayNested",
+			`var matrix: [][]int = [[1, 2], [3, 4]]
+print(matrix[0][0])
+print(matrix[0][1])
+print(matrix[1][0])
+print(matrix[1][1])`,
+			"1\n2\n3\n4\n",
+		},
+		{
+			"ArrayEmpty",
+			`var empty: []int = []
+print(len(empty))`,
+			"0\n",
+		},
+		{
+			"ArrayModifyNested",
+			`var matrix: [][]int = [[1, 2], [3, 4]]
+matrix[0][1] = 20
+matrix[1][0] = 30
+print(matrix[0][1])
+print(matrix[1][0])`,
+			"20\n30\n",
+		},
 	}
 
 	for _, tt := range tests {
@@ -341,6 +432,48 @@ add(1)`,
 			"AssignToConst",
 			`const x: int = 5
 x = 10`,
+		},
+		{
+			"MapWrongKeyTypeStringForInt",
+			`var ages: map[string]int = map[string]int{"Alice": 30}
+var key: int = 123
+print(ages[key])`,
+		},
+		{
+			"MapWrongKeyTypeIntForString",
+			`var names: map[int]string = map[int]string{1: "Alice"}
+var key: string = "key"
+print(names[key])`,
+		},
+		{
+			"MapWrongValueType",
+			`var ages: map[string]int = map[string]int{"Alice": 30}
+ages["Bob"] = "thirty"`,
+		},
+		{
+			"ArrayWrongElementType",
+			`var nums: []int = [1, 2, 3]
+nums[1] = "hello"`,
+		},
+		{
+			"ArrayWrongLiteralType",
+			`var nums: []int = [1, 2, "three"]
+print(nums[0])`,
+		},
+		{
+			"FunctionWrongArgCount",
+			`func add(x: int, y: int): int { return x + y }
+add(5)`,
+		},
+		{
+			"FunctionWrongArgType",
+			`func add(x: int, y: int): int { return x + y }
+add(5, "hello")`,
+		},
+		{
+			"FunctionWrongReturnType",
+			`func getName(): string { return 123 }
+getName()`,
 		},
 	}
 

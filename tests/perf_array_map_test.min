@@ -1,0 +1,50 @@
+// Performance test for array and map operations
+// Tests the benefit of compile-time type checking and specialized opcodes
+
+// Test 1: Array access performance
+var nums: []int = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+var sum: int = 0;
+
+for var i: int = 0; i < 1000; i = i + 1 {
+    sum = sum + nums[0] + nums[1] + nums[2] + nums[3] + nums[4];
+    sum = sum + nums[5] + nums[6] + nums[7] + nums[8] + nums[9];
+}
+
+print("Array test sum:", sum);
+
+// Test 2: Array assignment performance
+for var i: int = 0; i < 1000; i = i + 1 {
+    nums[0] = i;
+    nums[1] = i + 1;
+    nums[2] = i + 2;
+    nums[3] = i + 3;
+    nums[4] = i + 4;
+}
+
+print("Array assignment test done");
+
+// Test 3: Map access performance
+var ages: map[string]int = map[string]int{
+    "a": 1,
+    "b": 2,
+    "c": 3,
+    "d": 4,
+    "e": 5
+};
+
+var mapSum: int = 0;
+for var i: int = 0; i < 1000; i = i + 1 {
+    mapSum = mapSum + ages["a"] + ages["b"] + ages["c"] + ages["d"] + ages["e"];
+}
+
+print("Map test sum:", mapSum);
+
+// Test 4: Map assignment performance
+for var i: int = 0; i < 1000; i = i + 1 {
+    ages["a"] = i;
+    ages["b"] = i + 1;
+    ages["c"] = i + 2;
+}
+
+print("Map assignment test done");
+print("All performance tests completed");

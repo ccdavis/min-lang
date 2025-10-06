@@ -1,0 +1,16 @@
+// Test: Valid function calls
+func add(x: int, y: int): int {
+    return x + y;
+}
+
+func greet(name: string): string {
+    return "Hello, " + name;
+}
+
+func multiply(a: float, b: float): float {
+    return a * b;
+}
+
+print("add(5, 3):", add(5, 3));
+print("greet:", greet("World"));
+print("multiply:", multiply(2.5, 3.0));

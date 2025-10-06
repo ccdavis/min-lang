@@ -47,10 +47,13 @@ type Compiler struct {
 	typeChecker   *TypeChecker
 	typeCheckMode bool
 
-	loopStack   []LoopContext         // Stack of loop contexts
-	enumTypes   map[string]*EnumType  // Tracks enum type definitions
-	structTypes map[string]*StructType // Tracks struct type definitions
-	varTypes    map[string]vm.ValueType // Tracks variable types for type inference (Phase 1 optimization)
+	loopStack         []LoopContext          // Stack of loop contexts
+	enumTypes         map[string]*EnumType   // Tracks enum type definitions
+	structTypes       map[string]*StructType // Tracks struct type definitions
+	varTypes          map[string]vm.ValueType // Tracks variable types for type inference (Phase 1 optimization)
+	typeInfo          map[string]Type         // Tracks detailed type information for type checking
+	functionSigs      map[string]*FunctionType // Tracks function signatures for compile-time checking
+	currentFunctionRT Type                    // Current function's return type (for return statement checking)
 }
 
 // CompilationScope represents a compilation scope
@@ -77,14 +80,16 @@ func New() *Compiler {
 	symbolTable := NewSymbolTable()
 
 	return &Compiler{
-		constants:   []vm.Value{},
-		symbolTable: symbolTable,
-		scopes:      []CompilationScope{mainScope},
-		scopeIndex:  0,
-		loopStack:   []LoopContext{},
-		enumTypes:   make(map[string]*EnumType),
-		structTypes: make(map[string]*StructType),
-		varTypes:    make(map[string]vm.ValueType),
+		constants:    []vm.Value{},
+		symbolTable:  symbolTable,
+		scopes:       []CompilationScope{mainScope},
+		scopeIndex:   0,
+		loopStack:    []LoopContext{},
+		enumTypes:    make(map[string]*EnumType),
+		structTypes:  make(map[string]*StructType),
+		varTypes:     make(map[string]vm.ValueType),
+		typeInfo:     make(map[string]Type),
+		functionSigs: make(map[string]*FunctionType),
 	}
 }
 
@@ -536,12 +541,25 @@ func (c *Compiler) Compile(node ast.Node) error {
 		// Track variable type for type inference (Phase 1 optimization)
 		if node.Type != nil {
 			c.varTypes[node.Name.Value] = typeAnnotationToValueType(node.Type)
+			// Also track the full type information for type checking
+			c.typeInfo[node.Name.Value] = ConvertASTType(node.Type)
 		} else if node.Value != nil {
 			// Infer type from value
 			c.varTypes[node.Name.Value] = c.inferExpressionType(node.Value)
+			c.typeInfo[node.Name.Value] = c.inferDetailedType(node.Value)
 		}
 
 		if node.Value != nil {
+			// Type check the value if we have a declared type
+			if node.Type != nil {
+				declaredType := ConvertASTType(node.Type)
+
+				// For arrays and maps, do deep type checking
+				if err := c.checkValueType(node.Value, declaredType); err != nil {
+					return err
+				}
+			}
+
 			err := c.Compile(node.Value)
 			if err != nil {
 				return err
@@ -638,8 +656,31 @@ func (c *Compiler) Compile(node ast.Node) error {
 			c.storeSymbol(symbol)
 
 		case *ast.IndexExpression:
-			// For array[index] = value
-			// Stack layout: array, index, value
+			// For array[index] = value or map[key] = value
+			// Stack layout: array/map, index/key, value
+
+			// Type checking for array/map assignments
+			containerType := c.inferDetailedType(left.Left)
+			indexType := c.inferDetailedType(left.Index)
+			valueType := c.inferDetailedType(node.Value)
+
+			if arrayType, ok := containerType.(*ArrayType); ok {
+				// Array assignment: check element type
+				if !IsAssignableTo(valueType, arrayType.ElementType) {
+					return fmt.Errorf("cannot assign value of type %s to array element of type %s",
+						valueType.String(), arrayType.ElementType.String())
+				}
+			} else if mapType, ok := containerType.(*MapType); ok {
+				// Map assignment: check key and value types
+				if !IsAssignableTo(indexType, mapType.KeyType) {
+					return fmt.Errorf("cannot use key of type %s for map with key type %s",
+						indexType.String(), mapType.KeyType.String())
+				}
+				if !IsAssignableTo(valueType, mapType.ValueType) {
+					return fmt.Errorf("cannot assign value of type %s to map value of type %s",
+						valueType.String(), mapType.ValueType.String())
+				}
+			}
 
 			// Compile the array/map
 			err := c.Compile(left.Left)
@@ -659,8 +700,14 @@ func (c *Compiler) Compile(node ast.Node) error {
 				return err
 			}
 
-			// Emit set operation (runtime will determine if array or map)
-			c.emit(vm.OpArraySet)
+			// Emit specialized opcode based on container type
+			// The compiler knows the type, so we can avoid runtime dispatch
+			if _, ok := containerType.(*MapType); ok {
+				c.emit(vm.OpMapSet)
+			} else {
+				// Array assignment
+				c.emit(vm.OpArraySet)
+			}
 
 		case *ast.FieldAccessExpression:
 			// For struct.field = value
@@ -779,15 +826,35 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 
 	case *ast.FunctionStatement:
+		// Build function signature for type checking
+		paramTypes := make([]Type, len(node.Parameters))
+		for i, param := range node.Parameters {
+			paramTypes[i] = ConvertASTType(param.Type)
+		}
+		returnType := ConvertASTType(node.ReturnType)
+
+		funcType := &FunctionType{
+			ParamTypes: paramTypes,
+			ReturnType: returnType,
+		}
+		c.functionSigs[node.Name.Value] = funcType
+		c.typeInfo[node.Name.Value] = funcType
+
 		// Define the function name in the current scope BEFORE compiling the body
 		// This allows recursive calls
 		symbol := c.symbolTable.Define(node.Name.Value)
 
 		c.enterScope()
 
+		// Store the previous return type and set current one
+		prevReturnType := c.currentFunctionRT
+		c.currentFunctionRT = returnType
+
 		// Define parameters in the new scope
-		for _, param := range node.Parameters {
+		for i, param := range node.Parameters {
 			c.symbolTable.Define(param.Name.Value)
+			// Track parameter types
+			c.typeInfo[param.Name.Value] = paramTypes[i]
 		}
 
 		err := c.Compile(node.Body)
@@ -797,9 +864,16 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		// If the last instruction is not a return, add an implicit return nil
 		if !c.lastInstructionIs(vm.OpReturn) {
+			// Check if function expects a specific non-nil return value
+			if returnType != nil && !returnType.Equals(NilType) && !returnType.Equals(AnyTypeVal) {
+				return fmt.Errorf("function %s must return %s", node.Name.Value, returnType.String())
+			}
 			c.emit(vm.OpPush, c.addConstant(vm.NilValue()))
 			c.emit(vm.OpReturn)
 		}
+
+		// Restore previous return type
+		c.currentFunctionRT = prevReturnType
 
 		// Get the compiled instructions
 		freeSymbols := c.symbolTable.FreeSymbols
@@ -831,11 +905,24 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 	case *ast.ReturnStatement:
 		if node.ReturnValue != nil {
+			// Type check return value
+			if c.currentFunctionRT != nil {
+				returnValueType := c.inferDetailedType(node.ReturnValue)
+				if !IsAssignableTo(returnValueType, c.currentFunctionRT) {
+					return fmt.Errorf("cannot return %s from function expecting %s",
+						returnValueType.String(), c.currentFunctionRT.String())
+				}
+			}
+
 			err := c.Compile(node.ReturnValue)
 			if err != nil {
 				return err
 			}
 		} else {
+			// Returning nil
+			if c.currentFunctionRT != nil && !c.currentFunctionRT.Equals(NilType) && !c.currentFunctionRT.Equals(AnyTypeVal) {
+				return fmt.Errorf("cannot return nil from function expecting %s", c.currentFunctionRT.String())
+			}
 			c.emit(vm.OpPush, c.addConstant(vm.NilValue()))
 		}
 
@@ -862,6 +949,27 @@ func (c *Compiler) Compile(node ast.Node) error {
 		loop.continueJumps = append(loop.continueJumps, pos)
 
 	case *ast.CallExpression:
+		// Type check function call if we know the function signature
+		if ident, ok := node.Function.(*ast.Identifier); ok {
+			if funcType, exists := c.functionSigs[ident.Value]; exists {
+				// Check argument count
+				if len(node.Arguments) != len(funcType.ParamTypes) {
+					return fmt.Errorf("function %s expects %d arguments, got %d",
+						ident.Value, len(funcType.ParamTypes), len(node.Arguments))
+				}
+
+				// Check argument types
+				for i, arg := range node.Arguments {
+					argType := c.inferDetailedType(arg)
+					expectedType := funcType.ParamTypes[i]
+					if !IsAssignableTo(argType, expectedType) {
+						return fmt.Errorf("function %s argument %d: expected %s, got %s",
+							ident.Value, i+1, expectedType.String(), argType.String())
+					}
+				}
+			}
+		}
+
 		err := c.Compile(node.Function)
 		if err != nil {
 			return err
@@ -949,6 +1057,17 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 
 	case *ast.IndexExpression:
+		// Type checking for map key access
+		containerType := c.inferDetailedType(node.Left)
+		if mapType, ok := containerType.(*MapType); ok {
+			// For map access, check that the index type matches the key type
+			indexType := c.inferDetailedType(node.Index)
+			if !IsAssignableTo(indexType, mapType.KeyType) {
+				return fmt.Errorf("cannot use key of type %s for map with key type %s",
+					indexType.String(), mapType.KeyType.String())
+			}
+		}
+
 		// Compile the array/map expression
 		err := c.Compile(node.Left)
 		if err != nil {
@@ -961,9 +1080,14 @@ func (c *Compiler) Compile(node ast.Node) error {
 			return err
 		}
 
-		// Emit get operation
-		// We'll determine at runtime if it's array or map
-		c.emit(vm.OpArrayGet)
+		// Emit specialized opcode based on container type
+		// The compiler knows the type, so we can avoid runtime dispatch
+		if _, ok := containerType.(*MapType); ok {
+			c.emit(vm.OpMapGet)
+		} else {
+			// Array or string indexing
+			c.emit(vm.OpArrayGet)
+		}
 
 	case *ast.FieldAccessExpression:
 		// Compile the struct expression

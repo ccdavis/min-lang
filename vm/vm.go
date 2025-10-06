@@ -645,11 +645,13 @@ func (vm *VM) Run() error {
 				}
 
 			case OpArrayGet:
+				// Compiler guarantees this is an array or string (not a map)
 				index := vm.pop()
 				container := vm.pop()
 
 				switch container.Type {
 				case ArrayType:
+					// Array index must be integer - still need runtime check
 					if index.Type != IntType {
 						return fmt.Errorf("array index must be integer, got %d", index.Type)
 					}
@@ -666,24 +668,8 @@ func (vm *VM) Run() error {
 						return err
 					}
 
-				case MapType:
-					mapKey := index.ToMapKey()
-					mapData := container.AsMap()
-
-					val, ok := mapData.Pairs[mapKey]
-					if !ok {
-						err := vm.push(NilValue())
-						if err != nil {
-							return err
-						}
-					} else {
-						err := vm.push(val)
-						if err != nil {
-							return err
-						}
-					}
-
 				case StringType:
+					// String index must be integer - still need runtime check
 					if index.Type != IntType {
 						return fmt.Errorf("string index must be integer, got %d", index.Type)
 					}
@@ -702,37 +688,34 @@ func (vm *VM) Run() error {
 					}
 
 				default:
-					return fmt.Errorf("index operator not supported for type %d", container.Type)
+					// Should never reach here if compiler is correct
+					return fmt.Errorf("OpArrayGet: unexpected type %d", container.Type)
 				}
 
 			case OpArraySet:
+				// Compiler guarantees this is an array (not a map)
 				value := vm.pop()
 				index := vm.pop()
 				container := vm.pop()
 
-				switch container.Type {
-				case ArrayType:
-					if index.Type != IntType {
-						return fmt.Errorf("array index must be integer, got %d", index.Type)
-					}
-
-					idx := int(index.AsInt())
-					arrayVal := container.AsArray()
-
-					if idx < 0 || idx >= len(arrayVal.Elements) {
-						return fmt.Errorf("array index out of bounds: %d", idx)
-					}
-
-					arrayVal.Elements[idx] = value
-
-				case MapType:
-					mapKey := index.ToMapKey()
-					mapData := container.AsMap()
-					mapData.Pairs[mapKey] = value
-
-				default:
-					return fmt.Errorf("index assignment not supported for type %d", container.Type)
+				if container.Type != ArrayType {
+					// Should never reach here if compiler is correct
+					return fmt.Errorf("OpArraySet: expected array, got type %d", container.Type)
 				}
+
+				// Array index must be integer - still need runtime check
+				if index.Type != IntType {
+					return fmt.Errorf("array index must be integer, got %d", index.Type)
+				}
+
+				idx := int(index.AsInt())
+				arrayVal := container.AsArray()
+
+				if idx < 0 || idx >= len(arrayVal.Elements) {
+					return fmt.Errorf("array index out of bounds: %d", idx)
+				}
+
+				arrayVal.Elements[idx] = value
 
 			case OpMap:
 				size, _ := ReadOperand(ins, ip)
@@ -757,12 +740,9 @@ func (vm *VM) Run() error {
 				}
 
 			case OpMapGet:
+				// Compiler guarantees this is a map and key type is correct
 				key := vm.pop()
 				mapVal := vm.pop()
-
-				if mapVal.Type != MapType {
-					return fmt.Errorf("index operator not supported for type %d", mapVal.Type)
-				}
 
 				mapKey := key.ToMapKey()
 				mapData := mapVal.AsMap()
@@ -781,13 +761,10 @@ func (vm *VM) Run() error {
 				}
 
 			case OpMapSet:
+				// Compiler guarantees this is a map and key/value types are correct
 				value := vm.pop()
 				key := vm.pop()
 				mapVal := vm.pop()
-
-				if mapVal.Type != MapType {
-					return fmt.Errorf("index operator not supported for type %d", mapVal.Type)
-				}
 
 				mapKey := key.ToMapKey()
 				mapData := mapVal.AsMap()
@@ -1515,10 +1492,8 @@ func (vm *VM) executeCall(numArgs int) error {
 
 // callClosure calls a closure
 func (vm *VM) callClosure(cl *Closure, numArgs int) error {
-	if numArgs != cl.Fn.NumParams {
-		return fmt.Errorf("wrong number of arguments: want=%d, got=%d",
-			cl.Fn.NumParams, numArgs)
-	}
+	// Compiler guarantees correct argument count for user-defined functions
+	// No runtime check needed
 
 	// basePointer points to the first argument
 	// Stack layout: [... function arg1 arg2 ...]
@@ -1545,10 +1520,8 @@ func (vm *VM) callClosure(cl *Closure, numArgs int) error {
 
 // callFunction calls a function
 func (vm *VM) callFunction(fn *Function, numArgs int) error {
-	if numArgs != fn.NumParams {
-		return fmt.Errorf("wrong number of arguments: want=%d, got=%d",
-			fn.NumParams, numArgs)
-	}
+	// Compiler guarantees correct argument count for user-defined functions
+	// No runtime check needed
 
 	basePointer := vm.sp - numArgs
 

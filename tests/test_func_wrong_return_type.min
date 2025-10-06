@@ -1,0 +1,6 @@
+// Test: Wrong return type
+func getName(): string {
+    return 123;  // Should fail - returning int instead of string
+}
+
+print(getName());

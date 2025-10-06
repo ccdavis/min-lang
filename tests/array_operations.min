@@ -1,0 +1,169 @@
+// Test comprehensive array operations
+
+// Test 1: Basic int array creation and access
+var nums: []int = [10, 20, 30, 40, 50];
+print("Test 1: Basic int array");
+print("Array length:", len(nums));
+print("First element:", nums[0]);
+print("Third element:", nums[2]);
+print("Last element:", nums[4]);
+
+// Test 2: Modify array elements
+nums[0] = 100;
+nums[2] = 300;
+nums[4] = 500;
+print("\nTest 2: After modifying elements");
+print("First element:", nums[0]);
+print("Third element:", nums[2]);
+print("Last element:", nums[4]);
+
+// Test 3: Iterate and sum array
+var sum: int = 0;
+for var i: int = 0; i < len(nums); i = i + 1 {
+    sum = sum + nums[i];
+}
+print("\nTest 3: Sum of array elements");
+print("Sum:", sum);
+
+// Test 4: String array
+var fruits: []string = ["apple", "banana", "cherry", "date"];
+print("\nTest 4: String array");
+print("Array length:", len(fruits));
+print("First fruit:", fruits[0]);
+print("Second fruit:", fruits[1]);
+print("Third fruit:", fruits[2]);
+print("Fourth fruit:", fruits[3]);
+
+// Test 5: Modify string array
+fruits[1] = "blueberry";
+fruits[3] = "dragon fruit";
+print("\nTest 5: After modifying string array");
+print("Second fruit:", fruits[1]);
+print("Fourth fruit:", fruits[3]);
+
+// Test 6: Float array
+var prices: []float = [1.99, 2.50, 3.75, 4.25];
+print("\nTest 6: Float array");
+print("Array length:", len(prices));
+print("First price:", prices[0]);
+print("Last price:", prices[3]);
+
+// Test 7: Calculate average from float array
+var total: float = 0.0;
+for var i: int = 0; i < len(prices); i = i + 1 {
+    total = total + prices[i];
+}
+var average: float = total / 4.0;
+print("\nTest 7: Average price");
+print("Average:", average);
+
+// Test 8: Bool array
+var flags: []bool = [true, false, true, true, false];
+print("\nTest 8: Bool array");
+print("Array length:", len(flags));
+print("First flag:", flags[0]);
+print("Third flag:", flags[2]);
+print("Last flag:", flags[4]);
+
+// Test 9: Count true values in bool array
+var trueCount: int = 0;
+for var i: int = 0; i < len(flags); i = i + 1 {
+    if flags[i] {
+        trueCount = trueCount + 1;
+    }
+}
+print("\nTest 9: Count true values");
+print("True count:", trueCount);
+
+// Test 10: Nested arrays (array of arrays)
+var matrix: [][]int = [
+    [1, 2, 3],
+    [4, 5, 6],
+    [7, 8, 9]
+];
+print("\nTest 10: Nested arrays (matrix)");
+print("Matrix length:", len(matrix));
+print("First row length:", len(matrix[0]));
+print("Element [0][0]:", matrix[0][0]);
+print("Element [1][1]:", matrix[1][1]);
+print("Element [2][2]:", matrix[2][2]);
+
+// Test 11: Modify nested array
+matrix[0][1] = 20;
+matrix[1][1] = 50;
+matrix[2][1] = 80;
+print("\nTest 11: After modifying matrix middle column");
+print("Element [0][1]:", matrix[0][1]);
+print("Element [1][1]:", matrix[1][1]);
+print("Element [2][1]:", matrix[2][1]);
+
+// Test 12: Sum all elements in matrix
+var matrixSum: int = 0;
+for var i: int = 0; i < len(matrix); i = i + 1 {
+    for var j: int = 0; j < len(matrix[i]); j = j + 1 {
+        matrixSum = matrixSum + matrix[i][j];
+    }
+}
+print("\nTest 12: Sum of all matrix elements");
+print("Matrix sum:", matrixSum);
+
+// Test 13: Empty array
+var empty: []int = [];
+print("\nTest 13: Empty array");
+print("Empty array length:", len(empty));
+
+// Test 14: Single element array
+var single: []int = [42];
+print("\nTest 14: Single element array");
+print("Array length:", len(single));
+print("Element:", single[0]);
+
+// Test 15: Large array with loop initialization
+var large: []int = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+for var i: int = 0; i < len(large); i = i + 1 {
+    large[i] = i * 10;
+}
+print("\nTest 15: Large array filled with multiples of 10");
+print("Array length:", len(large));
+print("Element 0:", large[0]);
+print("Element 5:", large[5]);
+print("Element 9:", large[9]);
+
+// Test 16: Array search
+var searchArray: []int = [5, 12, 8, 23, 15, 9, 18];
+var target: int = 23;
+var found: bool = false;
+var foundIndex: int = -1;
+for var i: int = 0; i < len(searchArray); i = i + 1 {
+    if searchArray[i] == target {
+        found = true;
+        foundIndex = i;
+        break;
+    }
+}
+print("\nTest 16: Array search for", target);
+print("Found:", found);
+print("Found at index:", foundIndex);
+
+// Test 17: Find maximum in array
+var maxArray: []int = [34, 67, 23, 89, 12, 95, 41];
+var max: int = maxArray[0];
+for var i: int = 1; i < len(maxArray); i = i + 1 {
+    if maxArray[i] > max {
+        max = maxArray[i];
+    }
+}
+print("\nTest 17: Find maximum");
+print("Maximum value:", max);
+
+// Test 18: Find minimum in array
+var min: int = maxArray[0];
+for var i: int = 1; i < len(maxArray); i = i + 1 {
+    if maxArray[i] < min {
+        min = maxArray[i];
+    }
+}
+print("\nTest 18: Find minimum");
+print("Minimum value:", min);
+
+print("\n=== All array operations tests passed ===");

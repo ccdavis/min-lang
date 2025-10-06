@@ -1,0 +1,7 @@
+// This should fail: trying to assign string to int element in nested array
+var matrix: [][]int = [
+    [1, 2, 3],
+    [4, 5, 6]
+];
+
+matrix[0][1] = "hello";
