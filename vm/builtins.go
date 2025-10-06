@@ -273,19 +273,33 @@ func enumValueBuiltin(args ...Value) Value {
 	return NilValue()
 }
 
+// Cached builtin Values to avoid recreating them and growing the pool unnecessarily
+var builtinValueCache []Value
+
+// initBuiltinCache initializes the builtin value cache
+func init() {
+	builtinValueCache = make([]Value, len(Builtins))
+	for i := range Builtins {
+		fn := Builtins[i]
+		// Add to pool to prevent garbage collection
+		builtinFunctionPool = append(builtinFunctionPool, fn)
+		fnPtr := &builtinFunctionPool[len(builtinFunctionPool)-1]
+
+		builtinValueCache[i] = Value{
+			Type: BuiltinFunctionType,
+			Data: uint64(uintptr(unsafe.Pointer(fnPtr))),
+		}
+	}
+}
+
 // getBuiltin returns a built-in function as a Value
 func (vm *VM) getBuiltin(index int) Value {
 	if index < 0 || index >= len(Builtins) {
 		return NilValue()
 	}
 
-	// Return the builtin as a special function value
-	// Store pointer to the builtin function
-	fn := Builtins[index]
-	return Value{
-		Type: BuiltinFunctionType,
-		Data: uint64(uintptr(unsafe.Pointer(&fn))),
-	}
+	// Return the cached value instead of creating a new one each time
+	return builtinValueCache[index]
 }
 
 // executeBuiltin executes a built-in function

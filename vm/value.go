@@ -19,6 +19,10 @@ var arrayPool []*ArrayValue
 var mapPool []*MapValue
 var structPool []*StructValue
 
+// Builtin function pool - stores function pointers on heap to prevent dangling pointers
+// Note: BuiltinFunction is defined in builtins.go as func(args ...Value) Value
+var builtinFunctionPool []interface{}
+
 // ValueType represents the type of a value
 type ValueType byte
 
@@ -286,8 +290,16 @@ func (v Value) AsClosure() *Closure {
 }
 
 // AsBuiltinFunction extracts a builtin function from a Value
-// Note: BuiltinFunction is defined in builtins.go
+// Note: BuiltinFunction is defined in builtins.go as a named type
 func (v Value) AsBuiltinFunction() func(args ...Value) Value {
-	fnPtr := (*func(args ...Value) Value)(unsafe.Pointer(uintptr(v.Data)))
-	return *fnPtr
+	// The Data field contains a pointer to an interface{} in the builtinFunctionPool
+	// which holds the actual function value
+	interfacePtr := (*interface{})(unsafe.Pointer(uintptr(v.Data)))
+	// Cast to BuiltinFunction (the named type, not the underlying function type)
+	fn, ok := (*interfacePtr).(BuiltinFunction)
+	if !ok {
+		// This shouldn't happen, but provide a safe fallback
+		panic(fmt.Sprintf("AsBuiltinFunction: stored value is not a builtin function, got %T", *interfacePtr))
+	}
+	return fn
 }
