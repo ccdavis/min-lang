@@ -251,6 +251,101 @@ func (vm *VM) Run() error {
 					return fmt.Errorf("unsupported operand type for negation: %d", operand.Type)
 				}
 
+			// Type-specialized arithmetic operations (Phase 1 optimization)
+			// No runtime type checking - types are guaranteed by compiler
+			case OpAddInt:
+				right := vm.pop()
+				left := vm.pop()
+				err := vm.push(IntValue(left.AsInt() + right.AsInt()))
+				if err != nil {
+					return err
+				}
+
+			case OpAddFloat:
+				right := vm.pop()
+				left := vm.pop()
+				err := vm.push(FloatValue(left.AsFloat() + right.AsFloat()))
+				if err != nil {
+					return err
+				}
+
+			case OpAddString:
+				right := vm.pop()
+				left := vm.pop()
+				// String concatenation - use String() to handle type conversion
+				leftStr := left.String()
+				rightStr := right.String()
+				result := leftStr + rightStr
+				err := vm.push(StringValue(result))
+				if err != nil {
+					return err
+				}
+
+			case OpSubInt:
+				right := vm.pop()
+				left := vm.pop()
+				err := vm.push(IntValue(left.AsInt() - right.AsInt()))
+				if err != nil {
+					return err
+				}
+
+			case OpSubFloat:
+				right := vm.pop()
+				left := vm.pop()
+				err := vm.push(FloatValue(left.AsFloat() - right.AsFloat()))
+				if err != nil {
+					return err
+				}
+
+			case OpMulInt:
+				right := vm.pop()
+				left := vm.pop()
+				err := vm.push(IntValue(left.AsInt() * right.AsInt()))
+				if err != nil {
+					return err
+				}
+
+			case OpMulFloat:
+				right := vm.pop()
+				left := vm.pop()
+				err := vm.push(FloatValue(left.AsFloat() * right.AsFloat()))
+				if err != nil {
+					return err
+				}
+
+			case OpDivInt:
+				right := vm.pop()
+				left := vm.pop()
+				if right.AsInt() == 0 {
+					return ErrDivisionByZero
+				}
+				err := vm.push(IntValue(left.AsInt() / right.AsInt()))
+				if err != nil {
+					return err
+				}
+
+			case OpDivFloat:
+				right := vm.pop()
+				left := vm.pop()
+				if right.AsFloat() == 0 {
+					return ErrDivisionByZero
+				}
+				err := vm.push(FloatValue(left.AsFloat() / right.AsFloat()))
+				if err != nil {
+					return err
+				}
+
+			case OpModInt:
+				right := vm.pop()
+				left := vm.pop()
+				if right.AsInt() == 0 {
+					return ErrDivisionByZero
+				}
+				err := vm.push(IntValue(left.AsInt() % right.AsInt()))
+				if err != nil {
+					return err
+				}
+
 			case OpEq, OpNe, OpLt, OpGt, OpLe, OpGe:
 				err := vm.executeComparison(op)
 				if err != nil {

@@ -39,6 +39,7 @@ type Compiler struct {
 	loopStack   []LoopContext         // Stack of loop contexts
 	enumTypes   map[string]*EnumType  // Tracks enum type definitions
 	structTypes map[string]*StructType // Tracks struct type definitions
+	varTypes    map[string]vm.ValueType // Tracks variable types for type inference (Phase 1 optimization)
 }
 
 // CompilationScope represents a compilation scope
@@ -72,6 +73,7 @@ func New() *Compiler {
 		loopStack:   []LoopContext{},
 		enumTypes:   make(map[string]*EnumType),
 		structTypes: make(map[string]*StructType),
+		varTypes:    make(map[string]vm.ValueType),
 	}
 }
 
@@ -282,17 +284,20 @@ func (c *Compiler) Compile(node ast.Node) error {
 			return err
 		}
 
+		// Get operand types for type-specialized opcodes (Phase 1 optimization)
+		leftType, rightType := c.getOperandTypes(node)
+
 		switch node.Operator {
 		case "+":
-			c.tryEmitDirectLocalOp(vm.OpAdd, vm.OpAddLocal)
+			c.emitTypedAdd(leftType, rightType)
 		case "-":
-			c.tryEmitDirectLocalOp(vm.OpSub, vm.OpSubLocal)
+			c.emitTypedSub(leftType, rightType)
 		case "*":
-			c.tryEmitDirectLocalOp(vm.OpMul, vm.OpMulLocal)
+			c.emitTypedMul(leftType, rightType)
 		case "/":
-			c.tryEmitDirectLocalOp(vm.OpDiv, vm.OpDivLocal)
+			c.emitTypedDiv(leftType, rightType)
 		case "%":
-			c.emit(vm.OpMod)
+			c.emitTypedMod(leftType, rightType)
 		case ">":
 			c.emit(vm.OpGt)
 		case ">=":
@@ -386,6 +391,14 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 	case *ast.VarStatement:
 		symbol := c.symbolTable.DefineWithMutability(node.Name.Value, node.IsMutable)
+
+		// Track variable type for type inference (Phase 1 optimization)
+		if node.Type != nil {
+			c.varTypes[node.Name.Value] = typeAnnotationToValueType(node.Type)
+		} else if node.Value != nil {
+			// Infer type from value
+			c.varTypes[node.Name.Value] = c.inferExpressionType(node.Value)
+		}
 
 		if node.Value != nil {
 			err := c.Compile(node.Value)

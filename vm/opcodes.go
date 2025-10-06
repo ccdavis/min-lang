@@ -10,13 +10,25 @@ const (
 	OpDup                   // Duplicate top of stack
 	OpSwap                  // Swap top two stack values
 
-	// Arithmetic operations
-	OpAdd // Add top two stack values
-	OpSub // Subtract top two stack values
-	OpMul // Multiply top two stack values
-	OpDiv // Divide top two stack values
-	OpMod // Modulo operation
-	OpNeg // Negate top of stack
+	// Arithmetic operations (generic - with runtime type checking)
+	OpAdd // Add top two stack values (generic)
+	OpSub // Subtract top two stack values (generic)
+	OpMul // Multiply top two stack values (generic)
+	OpDiv // Divide top two stack values (generic)
+	OpMod // Modulo operation (generic)
+	OpNeg // Negate top of stack (generic)
+
+	// Type-specialized arithmetic operations (Phase 1 optimization - no runtime checks!)
+	OpAddInt    // int + int → int (no type checking)
+	OpAddFloat  // float + float → float (no type checking)
+	OpAddString // string + string → string (concatenation, no type checking)
+	OpSubInt    // int - int → int (no type checking)
+	OpSubFloat  // float - float → float (no type checking)
+	OpMulInt    // int * int → int (no type checking)
+	OpMulFloat  // float * float → float (no type checking)
+	OpDivInt    // int / int → int (no type checking)
+	OpDivFloat  // float / float → float (no type checking)
+	OpModInt    // int % int → int (no type checking)
 
 	// Direct local operations (no push/pop overhead)
 	OpAddLocal // Add TOS with local variable, push result
@@ -99,6 +111,26 @@ func (op OpCode) String() string {
 		return "MOD"
 	case OpNeg:
 		return "NEG"
+	case OpAddInt:
+		return "ADD_INT"
+	case OpAddFloat:
+		return "ADD_FLOAT"
+	case OpAddString:
+		return "ADD_STRING"
+	case OpSubInt:
+		return "SUB_INT"
+	case OpSubFloat:
+		return "SUB_FLOAT"
+	case OpMulInt:
+		return "MUL_INT"
+	case OpMulFloat:
+		return "MUL_FLOAT"
+	case OpDivInt:
+		return "DIV_INT"
+	case OpDivFloat:
+		return "DIV_FLOAT"
+	case OpModInt:
+		return "MOD_INT"
 	case OpAddLocal:
 		return "ADD_LOCAL"
 	case OpSubLocal:
