@@ -50,10 +50,27 @@ func Disassemble(bytecode []byte) string {
 			} else {
 				i++
 			}
+		// Phase 4B: Inc/Dec have 2 operands (variable index and amount)
+		case OpIncGlobal, OpDecGlobal, OpIncLocal, OpDecLocal:
+			if i+4 < len(bytecode) {
+				varIndex, _ := ReadOperand(bytecode, i+1)
+				amount, _ := ReadOperand(bytecode, i+3)
+				result += fmt.Sprintf(" %d %d", varIndex, amount)
+				i += 5
+			} else {
+				i++
+			}
 		case OpPush, OpLoadGlobal, OpStoreGlobal, OpLoadLocal, OpStoreLocal,
 			OpLoadFree, OpJump, OpJumpIfFalse, OpJumpIfTrue, OpCall,
 			OpGetBuiltin, OpArray, OpMap, OpStruct, OpGetField, OpSetField,
-			OpAddLocal, OpSubLocal, OpMulLocal, OpDivLocal:
+			OpAddLocal, OpSubLocal, OpMulLocal, OpDivLocal,
+			OpGetFieldOffset, OpSetFieldOffset,
+			// Phase 4A: Const ops have 1 operand (constant value)
+			OpAddConstInt, OpSubConstInt, OpMulConstInt, OpDivConstInt, OpModConstInt,
+			OpAddConstFloat, OpSubConstFloat, OpMulConstFloat, OpDivConstFloat,
+			// Phase 4D: Compare with const have 1 operand (constant value)
+			OpLtConstInt, OpGtConstInt, OpLeConstInt, OpGeConstInt, OpEqConstInt, OpNeConstInt,
+			OpLtConstFloat, OpGtConstFloat, OpLeConstFloat, OpGeConstFloat, OpEqConstFloat, OpNeConstFloat:
 			if i+2 < len(bytecode) {
 				operand, _ := ReadOperand(bytecode, i+1)
 				result += fmt.Sprintf(" %d", operand)

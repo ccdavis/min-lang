@@ -285,6 +285,131 @@ func (c *Compiler) Compile(node ast.Node) error {
 			return nil
 		}
 
+		// Phase 4C optimization: Detect square pattern (x * x)
+		if node.Operator == "*" {
+			leftIdent, leftIsIdent := node.Left.(*ast.Identifier)
+			rightIdent, rightIsIdent := node.Right.(*ast.Identifier)
+
+			if leftIsIdent && rightIsIdent && leftIdent.Value == rightIdent.Value {
+				// Pattern matched: x * x
+				err := c.Compile(node.Left)
+				if err != nil {
+					return err
+				}
+
+				// Determine type and emit appropriate square opcode
+				exprType := c.inferExpressionType(node.Left)
+				if exprType == vm.FloatType {
+					c.emit(vm.OpSquareFloat)
+				} else {
+					c.emit(vm.OpSquareInt)
+				}
+				return nil
+			}
+		}
+
+		// Phase 4A & 4D optimization: Detect operations with constant on right side
+		// Check if right operand is a constant literal
+		var constIndex int
+		var isConstInt, isConstFloat bool
+
+		if intLit, ok := node.Right.(*ast.IntegerLiteral); ok {
+			constIndex = c.addConstant(vm.IntValue(intLit.Value))
+			isConstInt = true
+		} else if floatLit, ok := node.Right.(*ast.FloatLiteral); ok {
+			constIndex = c.addConstant(vm.FloatValue(floatLit.Value))
+			isConstFloat = true
+		}
+
+		if isConstInt || isConstFloat {
+			// Compile left operand only
+			err := c.Compile(node.Left)
+			if err != nil {
+				return err
+			}
+
+			// Emit optimized opcode based on operator
+			switch node.Operator {
+			// Phase 4A: Arithmetic with constant
+			case "+":
+				if isConstInt {
+					c.emit(vm.OpAddConstInt, constIndex)
+				} else {
+					c.emit(vm.OpAddConstFloat, constIndex)
+				}
+				return nil
+			case "-":
+				if isConstInt {
+					c.emit(vm.OpSubConstInt, constIndex)
+				} else {
+					c.emit(vm.OpSubConstFloat, constIndex)
+				}
+				return nil
+			case "*":
+				if isConstInt {
+					c.emit(vm.OpMulConstInt, constIndex)
+				} else {
+					c.emit(vm.OpMulConstFloat, constIndex)
+				}
+				return nil
+			case "/":
+				if isConstInt {
+					c.emit(vm.OpDivConstInt, constIndex)
+				} else {
+					c.emit(vm.OpDivConstFloat, constIndex)
+				}
+				return nil
+			case "%":
+				if isConstInt {
+					c.emit(vm.OpModConstInt, constIndex)
+					return nil
+				}
+			// Phase 4D: Comparison with constant
+			case "==":
+				if isConstInt {
+					c.emit(vm.OpEqConstInt, constIndex)
+				} else {
+					c.emit(vm.OpEqConstFloat, constIndex)
+				}
+				return nil
+			case "!=":
+				if isConstInt {
+					c.emit(vm.OpNeConstInt, constIndex)
+				} else {
+					c.emit(vm.OpNeConstFloat, constIndex)
+				}
+				return nil
+			case "<":
+				if isConstInt {
+					c.emit(vm.OpLtConstInt, constIndex)
+				} else {
+					c.emit(vm.OpLtConstFloat, constIndex)
+				}
+				return nil
+			case ">":
+				if isConstInt {
+					c.emit(vm.OpGtConstInt, constIndex)
+				} else {
+					c.emit(vm.OpGtConstFloat, constIndex)
+				}
+				return nil
+			case "<=":
+				if isConstInt {
+					c.emit(vm.OpLeConstInt, constIndex)
+				} else {
+					c.emit(vm.OpLeConstFloat, constIndex)
+				}
+				return nil
+			case ">=":
+				if isConstInt {
+					c.emit(vm.OpGeConstInt, constIndex)
+				} else {
+					c.emit(vm.OpGeConstFloat, constIndex)
+				}
+				return nil
+			}
+		}
+
 		err := c.Compile(node.Left)
 		if err != nil {
 			return err
@@ -452,6 +577,56 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 			if !symbol.IsMutable {
 				return fmt.Errorf("cannot assign to const variable %s", left.Value)
+			}
+
+			// Phase 4B optimization: Detect increment/decrement pattern (i = i + const)
+			if infix, ok := node.Value.(*ast.InfixExpression); ok {
+				if leftIdent, ok := infix.Left.(*ast.Identifier); ok {
+					if leftIdent.Value == left.Value && (infix.Operator == "+" || infix.Operator == "-") {
+						// Check if right side is an integer literal
+						if intLit, ok := infix.Right.(*ast.IntegerLiteral); ok {
+							// Pattern matched: i = i +/- constant
+							amount := int(intLit.Value)
+							if amount >= 0 && amount <= 65535 { // Fits in 2-byte operand
+								if infix.Operator == "+" {
+									if symbol.Scope == GlobalScope {
+										c.emit(vm.OpIncGlobal, symbol.Index, amount)
+									} else {
+										c.emit(vm.OpIncLocal, symbol.Index, amount)
+									}
+								} else { // "-"
+									if symbol.Scope == GlobalScope {
+										c.emit(vm.OpDecGlobal, symbol.Index, amount)
+									} else {
+										c.emit(vm.OpDecLocal, symbol.Index, amount)
+									}
+								}
+								return nil
+							}
+						}
+						// Also handle float literals for float variables
+						if floatLit, ok := infix.Right.(*ast.FloatLiteral); ok {
+							// For floats, we can still use inc/dec if it's a whole number
+							amount := int(floatLit.Value)
+							if float64(amount) == floatLit.Value && amount >= 0 && amount <= 65535 {
+								if infix.Operator == "+" {
+									if symbol.Scope == GlobalScope {
+										c.emit(vm.OpIncGlobal, symbol.Index, amount)
+									} else {
+										c.emit(vm.OpIncLocal, symbol.Index, amount)
+									}
+								} else { // "-"
+									if symbol.Scope == GlobalScope {
+										c.emit(vm.OpDecGlobal, symbol.Index, amount)
+									} else {
+										c.emit(vm.OpDecLocal, symbol.Index, amount)
+									}
+								}
+								return nil
+							}
+						}
+					}
+				}
 			}
 
 			// Compile the value

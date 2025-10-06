@@ -938,6 +938,337 @@ func (vm *VM) Run() error {
 
 				structData.FieldsArray[offset] = value
 
+			// Phase 4A: Immediate constant arithmetic operations
+			case OpAddConstInt:
+				constIndex, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				tos := vm.pop()
+				constVal := vm.constants[constIndex]
+				result := tos.AsInt() + constVal.AsInt()
+				err := vm.push(IntValue(result))
+				if err != nil {
+					return err
+				}
+
+			case OpSubConstInt:
+				constIndex, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				tos := vm.pop()
+				constVal := vm.constants[constIndex]
+				result := tos.AsInt() - constVal.AsInt()
+				err := vm.push(IntValue(result))
+				if err != nil {
+					return err
+				}
+
+			case OpMulConstInt:
+				constIndex, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				tos := vm.pop()
+				constVal := vm.constants[constIndex]
+				result := tos.AsInt() * constVal.AsInt()
+				err := vm.push(IntValue(result))
+				if err != nil {
+					return err
+				}
+
+			case OpDivConstInt:
+				constIndex, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				tos := vm.pop()
+				constVal := vm.constants[constIndex]
+				if constVal.AsInt() == 0 {
+					return ErrDivisionByZero
+				}
+				result := tos.AsInt() / constVal.AsInt()
+				err := vm.push(IntValue(result))
+				if err != nil {
+					return err
+				}
+
+			case OpModConstInt:
+				constIndex, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				tos := vm.pop()
+				constVal := vm.constants[constIndex]
+				if constVal.AsInt() == 0 {
+					return ErrModuloByZero
+				}
+				result := tos.AsInt() % constVal.AsInt()
+				err := vm.push(IntValue(result))
+				if err != nil {
+					return err
+				}
+
+			case OpAddConstFloat:
+				constIndex, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				tos := vm.pop()
+				constVal := vm.constants[constIndex]
+				result := tos.AsFloat() + constVal.AsFloat()
+				err := vm.push(FloatValue(result))
+				if err != nil {
+					return err
+				}
+
+			case OpSubConstFloat:
+				constIndex, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				tos := vm.pop()
+				constVal := vm.constants[constIndex]
+				result := tos.AsFloat() - constVal.AsFloat()
+				err := vm.push(FloatValue(result))
+				if err != nil {
+					return err
+				}
+
+			case OpMulConstFloat:
+				constIndex, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				tos := vm.pop()
+				constVal := vm.constants[constIndex]
+				result := tos.AsFloat() * constVal.AsFloat()
+				err := vm.push(FloatValue(result))
+				if err != nil {
+					return err
+				}
+
+			case OpDivConstFloat:
+				constIndex, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				tos := vm.pop()
+				constVal := vm.constants[constIndex]
+				if constVal.AsFloat() == 0 {
+					return ErrDivisionByZero
+				}
+				result := tos.AsFloat() / constVal.AsFloat()
+				err := vm.push(FloatValue(result))
+				if err != nil {
+					return err
+				}
+
+			// Phase 4B: Increment/decrement operations
+			case OpIncGlobal:
+				globalIndex, _ := ReadOperand(ins, ip)
+				amount, _ := ReadOperand(ins, ip+2)
+				ip += 4
+
+				current := vm.globals[globalIndex]
+				if current.Type == IntType {
+					vm.globals[globalIndex] = IntValue(current.AsInt() + int64(amount))
+				} else if current.Type == FloatType {
+					vm.globals[globalIndex] = FloatValue(current.AsFloat() + float64(amount))
+				}
+
+			case OpDecGlobal:
+				globalIndex, _ := ReadOperand(ins, ip)
+				amount, _ := ReadOperand(ins, ip+2)
+				ip += 4
+
+				current := vm.globals[globalIndex]
+				if current.Type == IntType {
+					vm.globals[globalIndex] = IntValue(current.AsInt() - int64(amount))
+				} else if current.Type == FloatType {
+					vm.globals[globalIndex] = FloatValue(current.AsFloat() - float64(amount))
+				}
+
+			case OpIncLocal:
+				localIndex, _ := ReadOperand(ins, ip)
+				amount, _ := ReadOperand(ins, ip+2)
+				ip += 4
+
+				current := vm.stack[frame.basePointer+localIndex]
+				if current.Type == IntType {
+					vm.stack[frame.basePointer+localIndex] = IntValue(current.AsInt() + int64(amount))
+				} else if current.Type == FloatType {
+					vm.stack[frame.basePointer+localIndex] = FloatValue(current.AsFloat() + float64(amount))
+				}
+
+			case OpDecLocal:
+				localIndex, _ := ReadOperand(ins, ip)
+				amount, _ := ReadOperand(ins, ip+2)
+				ip += 4
+
+				current := vm.stack[frame.basePointer+localIndex]
+				if current.Type == IntType {
+					vm.stack[frame.basePointer+localIndex] = IntValue(current.AsInt() - int64(amount))
+				} else if current.Type == FloatType {
+					vm.stack[frame.basePointer+localIndex] = FloatValue(current.AsFloat() - float64(amount))
+				}
+
+			// Phase 4C: Square operations
+			case OpSquareInt:
+				tos := vm.pop()
+				val := tos.AsInt()
+				result := val * val
+				err := vm.push(IntValue(result))
+				if err != nil {
+					return err
+				}
+
+			case OpSquareFloat:
+				tos := vm.pop()
+				val := tos.AsFloat()
+				result := val * val
+				err := vm.push(FloatValue(result))
+				if err != nil {
+					return err
+				}
+
+			// Phase 4D: Compare with immediate constant
+			case OpLtConstInt:
+				constIndex, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				tos := vm.pop()
+				constVal := vm.constants[constIndex]
+				result := tos.AsInt() < constVal.AsInt()
+				err := vm.push(BoolValue(result))
+				if err != nil {
+					return err
+				}
+
+			case OpGtConstInt:
+				constIndex, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				tos := vm.pop()
+				constVal := vm.constants[constIndex]
+				result := tos.AsInt() > constVal.AsInt()
+				err := vm.push(BoolValue(result))
+				if err != nil {
+					return err
+				}
+
+			case OpLeConstInt:
+				constIndex, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				tos := vm.pop()
+				constVal := vm.constants[constIndex]
+				result := tos.AsInt() <= constVal.AsInt()
+				err := vm.push(BoolValue(result))
+				if err != nil {
+					return err
+				}
+
+			case OpGeConstInt:
+				constIndex, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				tos := vm.pop()
+				constVal := vm.constants[constIndex]
+				result := tos.AsInt() >= constVal.AsInt()
+				err := vm.push(BoolValue(result))
+				if err != nil {
+					return err
+				}
+
+			case OpEqConstInt:
+				constIndex, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				tos := vm.pop()
+				constVal := vm.constants[constIndex]
+				result := tos.AsInt() == constVal.AsInt()
+				err := vm.push(BoolValue(result))
+				if err != nil {
+					return err
+				}
+
+			case OpNeConstInt:
+				constIndex, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				tos := vm.pop()
+				constVal := vm.constants[constIndex]
+				result := tos.AsInt() != constVal.AsInt()
+				err := vm.push(BoolValue(result))
+				if err != nil {
+					return err
+				}
+
+			case OpLtConstFloat:
+				constIndex, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				tos := vm.pop()
+				constVal := vm.constants[constIndex]
+				result := tos.AsFloat() < constVal.AsFloat()
+				err := vm.push(BoolValue(result))
+				if err != nil {
+					return err
+				}
+
+			case OpGtConstFloat:
+				constIndex, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				tos := vm.pop()
+				constVal := vm.constants[constIndex]
+				result := tos.AsFloat() > constVal.AsFloat()
+				err := vm.push(BoolValue(result))
+				if err != nil {
+					return err
+				}
+
+			case OpLeConstFloat:
+				constIndex, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				tos := vm.pop()
+				constVal := vm.constants[constIndex]
+				result := tos.AsFloat() <= constVal.AsFloat()
+				err := vm.push(BoolValue(result))
+				if err != nil {
+					return err
+				}
+
+			case OpGeConstFloat:
+				constIndex, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				tos := vm.pop()
+				constVal := vm.constants[constIndex]
+				result := tos.AsFloat() >= constVal.AsFloat()
+				err := vm.push(BoolValue(result))
+				if err != nil {
+					return err
+				}
+
+			case OpEqConstFloat:
+				constIndex, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				tos := vm.pop()
+				constVal := vm.constants[constIndex]
+				result := tos.AsFloat() == constVal.AsFloat()
+				err := vm.push(BoolValue(result))
+				if err != nil {
+					return err
+				}
+
+			case OpNeConstFloat:
+				constIndex, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				tos := vm.pop()
+				constVal := vm.constants[constIndex]
+				result := tos.AsFloat() != constVal.AsFloat()
+				err := vm.push(BoolValue(result))
+				if err != nil {
+					return err
+				}
+
 			case OpPrint:
 				val := vm.pop()
 				fmt.Println(val.String())

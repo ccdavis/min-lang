@@ -106,6 +106,41 @@ const (
 	OpGetFieldOffset // Get struct field by offset (no map lookup!)
 	OpSetFieldOffset // Set struct field by offset (no map lookup!)
 
+	// Phase 4A: Immediate constant arithmetic operations (variable OP constant)
+	OpAddConstInt   // Add constant to TOS int (TOS + immediate → TOS)
+	OpSubConstInt   // Subtract constant from TOS int (TOS - immediate → TOS)
+	OpMulConstInt   // Multiply TOS int by constant (TOS * immediate → TOS)
+	OpDivConstInt   // Divide TOS int by constant (TOS / immediate → TOS)
+	OpModConstInt   // Modulo TOS int by constant (TOS % immediate → TOS)
+	OpAddConstFloat // Add constant to TOS float (TOS + immediate → TOS)
+	OpSubConstFloat // Subtract constant from TOS float (TOS - immediate → TOS)
+	OpMulConstFloat // Multiply TOS float by constant (TOS * immediate → TOS)
+	OpDivConstFloat // Divide TOS float by constant (TOS / immediate → TOS)
+
+	// Phase 4B: Increment/decrement operations (special case of 4A)
+	OpIncGlobal // Increment global variable by immediate value
+	OpDecGlobal // Decrement global variable by immediate value
+	OpIncLocal  // Increment local variable by immediate value
+	OpDecLocal  // Decrement local variable by immediate value
+
+	// Phase 4C: Square operations (x * x)
+	OpSquareInt   // Square TOS int (TOS * TOS → TOS)
+	OpSquareFloat // Square TOS float (TOS * TOS → TOS)
+
+	// Phase 4D: Compare with immediate constant
+	OpLtConstInt    // TOS < immediate (int)
+	OpGtConstInt    // TOS > immediate (int)
+	OpLeConstInt    // TOS <= immediate (int)
+	OpGeConstInt    // TOS >= immediate (int)
+	OpEqConstInt    // TOS == immediate (int)
+	OpNeConstInt    // TOS != immediate (int)
+	OpLtConstFloat  // TOS < immediate (float)
+	OpGtConstFloat  // TOS > immediate (float)
+	OpLeConstFloat  // TOS <= immediate (float)
+	OpGeConstFloat  // TOS >= immediate (float)
+	OpEqConstFloat  // TOS == immediate (float)
+	OpNeConstFloat  // TOS != immediate (float)
+
 	// Special operations
 	OpHalt       // Halt execution
 	OpPrint      // Built-in print (for debugging)
@@ -262,6 +297,64 @@ func (op OpCode) String() string {
 		return "GET_FIELD_OFFSET"
 	case OpSetFieldOffset:
 		return "SET_FIELD_OFFSET"
+	// Phase 4A
+	case OpAddConstInt:
+		return "ADD_CONST_INT"
+	case OpSubConstInt:
+		return "SUB_CONST_INT"
+	case OpMulConstInt:
+		return "MUL_CONST_INT"
+	case OpDivConstInt:
+		return "DIV_CONST_INT"
+	case OpModConstInt:
+		return "MOD_CONST_INT"
+	case OpAddConstFloat:
+		return "ADD_CONST_FLOAT"
+	case OpSubConstFloat:
+		return "SUB_CONST_FLOAT"
+	case OpMulConstFloat:
+		return "MUL_CONST_FLOAT"
+	case OpDivConstFloat:
+		return "DIV_CONST_FLOAT"
+	// Phase 4B
+	case OpIncGlobal:
+		return "INC_GLOBAL"
+	case OpDecGlobal:
+		return "DEC_GLOBAL"
+	case OpIncLocal:
+		return "INC_LOCAL"
+	case OpDecLocal:
+		return "DEC_LOCAL"
+	// Phase 4C
+	case OpSquareInt:
+		return "SQUARE_INT"
+	case OpSquareFloat:
+		return "SQUARE_FLOAT"
+	// Phase 4D
+	case OpLtConstInt:
+		return "LT_CONST_INT"
+	case OpGtConstInt:
+		return "GT_CONST_INT"
+	case OpLeConstInt:
+		return "LE_CONST_INT"
+	case OpGeConstInt:
+		return "GE_CONST_INT"
+	case OpEqConstInt:
+		return "EQ_CONST_INT"
+	case OpNeConstInt:
+		return "NE_CONST_INT"
+	case OpLtConstFloat:
+		return "LT_CONST_FLOAT"
+	case OpGtConstFloat:
+		return "GT_CONST_FLOAT"
+	case OpLeConstFloat:
+		return "LE_CONST_FLOAT"
+	case OpGeConstFloat:
+		return "GE_CONST_FLOAT"
+	case OpEqConstFloat:
+		return "EQ_CONST_FLOAT"
+	case OpNeConstFloat:
+		return "NE_CONST_FLOAT"
 	case OpHalt:
 		return "HALT"
 	case OpPrint:
