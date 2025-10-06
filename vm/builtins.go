@@ -104,6 +104,8 @@ func appendBuiltin(args ...Value) Value {
 	}
 
 	arr := &ArrayValue{Elements: newElements}
+	// Add to pool to keep it alive for GC (critical - without this the pointer becomes dangling!)
+	arrayPool = append(arrayPool, arr)
 	return Value{
 		Type: ArrayType,
 		Data: uint64(uintptr(unsafe.Pointer(arr))),
@@ -135,6 +137,8 @@ func keysBuiltin(args ...Value) Value {
 	}
 
 	arr := &ArrayValue{Elements: keys}
+	// Add to pool to keep it alive for GC
+	arrayPool = append(arrayPool, arr)
 	return Value{
 		Type: ArrayType,
 		Data: uint64(uintptr(unsafe.Pointer(arr))),
@@ -162,6 +166,8 @@ func valuesBuiltin(args ...Value) Value {
 	}
 
 	arr := &ArrayValue{Elements: values}
+	// Add to pool to keep it alive for GC
+	arrayPool = append(arrayPool, arr)
 	return Value{
 		Type: ArrayType,
 		Data: uint64(uintptr(unsafe.Pointer(arr))),
@@ -186,6 +192,8 @@ func copyBuiltin(args ...Value) Value {
 	copy(newElements, oldArray.Elements)
 
 	arr := &ArrayValue{Elements: newElements}
+	// Add to pool to keep it alive for GC
+	arrayPool = append(arrayPool, arr)
 	return Value{
 		Type: ArrayType,
 		Data: uint64(uintptr(unsafe.Pointer(arr))),
@@ -278,12 +286,16 @@ var builtinValueCache []Value
 
 // initBuiltinCache initializes the builtin value cache
 func init() {
+	// Pre-allocate the pool with exact capacity to avoid reallocation
+	// This is critical: if the pool reallocates, pointers in builtinValueCache become invalid!
+	builtinFunctionPool = make([]interface{}, 0, len(Builtins))
 	builtinValueCache = make([]Value, len(Builtins))
+
 	for i := range Builtins {
 		fn := Builtins[i]
 		// Add to pool to prevent garbage collection
 		builtinFunctionPool = append(builtinFunctionPool, fn)
-		fnPtr := &builtinFunctionPool[len(builtinFunctionPool)-1]
+		fnPtr := &builtinFunctionPool[i]  // Use index instead of len-1
 
 		builtinValueCache[i] = Value{
 			Type: BuiltinFunctionType,
