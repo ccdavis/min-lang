@@ -6,6 +6,11 @@ import (
 	"unsafe"
 )
 
+// Pool size limit to prevent unbounded memory growth in long-running programs
+// When a pool exceeds this size, we keep only the most recent entries.
+// This assumes newer allocations are more likely to still be in use.
+const MaxPoolSize = 100000
+
 // String pool to keep strings alive for GC
 // The GC doesn't track uint64, so we need to keep references to heap-allocated data
 // No locking needed - VM is single-threaded
@@ -22,6 +27,16 @@ var structPool []*StructValue
 // Builtin function pool - stores function pointers on heap to prevent dangling pointers
 // Note: BuiltinFunction is defined in builtins.go as func(args ...Value) Value
 var builtinFunctionPool []interface{}
+
+// trimPool keeps a pool at a reasonable size by keeping only recent entries
+func trimPool[T any](pool *[]T) {
+	if len(*pool) > MaxPoolSize {
+		// Keep the most recent MaxPoolSize/2 entries
+		// This gives us headroom before hitting the limit again
+		keepSize := MaxPoolSize / 2
+		*pool = (*pool)[len(*pool)-keepSize:]
+	}
+}
 
 // ValueType represents the type of a value
 type ValueType byte
@@ -87,6 +102,7 @@ func StringValue(s string) Value {
 
 	// Add to pool so GC doesn't collect it (no locking needed - VM is single-threaded)
 	stringPool = append(stringPool, ptr)
+	trimPool(&stringPool)
 
 	return Value{Type: StringType, Data: uint64(uintptr(unsafe.Pointer(ptr)))}
 }
@@ -158,6 +174,7 @@ func NewArrayValue(size int) Value {
 	arr := &ArrayValue{Elements: make([]Value, size)}
 	// Add to pool to keep it alive for GC
 	arrayPool = append(arrayPool, arr)
+	trimPool(&arrayPool)
 	return Value{
 		Type: ArrayType,
 		Data: uint64(uintptr(unsafe.Pointer(arr))),
@@ -184,6 +201,7 @@ func NewMapValue() Value {
 	m := &MapValue{Pairs: make(map[MapKey]Value)}
 	// Add to pool to keep it alive for GC
 	mapPool = append(mapPool, m)
+	trimPool(&mapPool)
 	return Value{
 		Type: MapType,
 		Data: uint64(uintptr(unsafe.Pointer(m))),
@@ -217,6 +235,7 @@ func NewStructValue(typeName string, fields map[string]Value) Value {
 	}
 	// Add to pool to keep it alive for GC
 	structPool = append(structPool, s)
+	trimPool(&structPool)
 	return Value{
 		Type: StructType,
 		Data: uint64(uintptr(unsafe.Pointer(s))),
@@ -240,6 +259,7 @@ func NewStructValueOrdered(typeName string, fieldNames []string, fieldValues []V
 	}
 	// Add to pool to keep it alive for GC
 	structPool = append(structPool, s)
+	trimPool(&structPool)
 	return Value{
 		Type: StructType,
 		Data: uint64(uintptr(unsafe.Pointer(s))),
@@ -262,6 +282,7 @@ type Function struct {
 func NewFunctionValue(fn *Function) Value {
 	// Add to pool to keep it alive for GC
 	functionPool = append(functionPool, fn)
+	trimPool(&functionPool)
 	return Value{Type: FunctionType, Data: uint64(uintptr(unsafe.Pointer(fn)))}
 }
 
@@ -279,6 +300,7 @@ func NewClosureValue(fn *Function, free []Value) Value {
 	cl := &Closure{Fn: fn, Free: free}
 	// Add to pool to keep it alive for GC
 	closurePool = append(closurePool, cl)
+	trimPool(&closurePool)
 	return Value{
 		Type: ClosureType,
 		Data: uint64(uintptr(unsafe.Pointer(cl))),
