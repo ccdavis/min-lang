@@ -272,11 +272,12 @@ func (v Value) AsStruct() *StructValue {
 
 // Function represents a compiled function
 type Function struct {
-	Name          string
-	NumParams     int
-	NumLocals     int
-	Instructions  []byte
-	Constants     []Value
+	Name                 string
+	NumParams            int
+	NumLocals            int
+	Instructions         []byte                // Stack bytecode (for stack VM)
+	RegisterInstructions []RegisterInstruction // Register bytecode (for register VM)
+	Constants            []Value
 }
 
 func NewFunctionValue(fn *Function) Value {

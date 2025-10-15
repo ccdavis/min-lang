@@ -19,7 +19,7 @@ var (
 const (
 	StackSize      = 2048
 	GlobalsSize    = 65536
-	MaxFrames      = 1024
+	MaxFrames      = 8192  // Increased for deep recursion (e.g., fibonacci)
 )
 
 // Frame represents a call frame

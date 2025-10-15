@@ -8,6 +8,7 @@ import (
 	"minlang/parser"
 	"minlang/vm"
 	"os"
+	"runtime/pprof"
 	"strings"
 )
 
@@ -15,6 +16,7 @@ func main() {
 	// Define flags
 	backend := flag.String("backend", "stack", "VM backend: stack or register")
 	debug := flag.Bool("debug", false, "Print bytecode debug information")
+	cpuprofile := flag.String("cpuprofile", "", "Write CPU profile to file")
 	flag.Parse()
 
 	if flag.NArg() < 1 {
@@ -25,6 +27,21 @@ func main() {
 	}
 
 	sourceFile := flag.Arg(0)
+
+	// Start CPU profiling if requested
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Could not create CPU profile: %v\n", err)
+			os.Exit(1)
+		}
+		defer f.Close()
+		if err := pprof.StartCPUProfile(f); err != nil {
+			fmt.Fprintf(os.Stderr, "Could not start CPU profile: %v\n", err)
+			os.Exit(1)
+		}
+		defer pprof.StopCPUProfile()
+	}
 
 	// Read source file
 	source, err := os.ReadFile(sourceFile)
@@ -53,7 +70,7 @@ func main() {
 		// Register backend
 		fmt.Println("[Register VM - Experimental]")
 		rc := compiler.NewRegisterCompiler()
-		err = rc.CompileToRegister(program)
+		_, err = rc.CompileToRegister(program)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Register compilation error: %v\n", err)
 			os.Exit(1)
