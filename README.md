@@ -14,7 +14,7 @@ A fast, educational programming language with a stack-based virtual machine. Min
 
 ## Performance
 
-MinLang achieves **~31% of Python's speed** through aggressive optimizations:
+MinLang achieves **~33% of Python's speed** through aggressive optimizations:
 
 - Tagged union values (zero boxing overhead)
 - Direct local operations (peephole optimization)
@@ -183,16 +183,20 @@ The `examples/` directory contains:
 
 ## Benchmarks
 
-Performance on mandelbrot benchmark (122.3M iterations):
+Performance on heavy Mandelbrot benchmark (82M-122M iterations):
 
-| Language | Time | Relative Speed |
-|----------|------|----------------|
-| C (gcc -O3) | 5.5s | 1.0× (baseline) |
-| Go (compiled) | 8.2s | 1.5× |
-| MinLang | **18.4s** | **3.3×** |
-| Python 3.10 | 58.2s | 10.6× |
+| Language | Time | Iterations/sec | Relative to Python |
+|----------|------|----------------|---------------------|
+| Python 3 | 5.3s | 23.1M/s | 1.00× (baseline) |
+| Ruby 3 | 5.8s | 21.0M/s | 0.91× (91% of Python) |
+| MinLang | 10.7s | 7.7M/s | 0.33× (33% of Python) |
 
-**MinLang is 3.16× faster than Python** on compute-intensive workloads.
+**Comparison summary:**
+- Python and Ruby are nearly identical in performance (Ruby is 91% of Python's speed)
+- MinLang achieves 33% of Python's performance, which is respectable for an educational bytecode interpreter without JIT compilation
+- MinLang is 37% the speed of Ruby
+
+All benchmarks use pure native code with no external libraries or optimizations.
 
 ## Development
 
