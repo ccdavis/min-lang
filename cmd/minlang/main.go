@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"minlang/compiler"
 	"minlang/lexer"
@@ -11,12 +12,19 @@ import (
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: minlang <source-file>")
+	// Define flags
+	backend := flag.String("backend", "stack", "VM backend: stack or register")
+	debug := flag.Bool("debug", false, "Print bytecode debug information")
+	flag.Parse()
+
+	if flag.NArg() < 1 {
+		fmt.Println("Usage: minlang [flags] <source-file>")
+		fmt.Println("Flags:")
+		flag.PrintDefaults()
 		os.Exit(1)
 	}
 
-	sourceFile := os.Args[1]
+	sourceFile := flag.Arg(0)
 
 	// Read source file
 	source, err := os.ReadFile(sourceFile)
@@ -40,49 +48,82 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Compile
-	c := compiler.New()
-	err = c.Compile(program)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Compilation error: %v\n", err)
-		os.Exit(1)
-	}
-
-	bytecode := c.Bytecode()
-
-	// Debug: print bytecode if --debug flag is present
-	if len(os.Args) > 2 && os.Args[2] == "--debug" {
-		fmt.Println("=== Bytecode Debug ===")
-		fmt.Printf("Total constants: %d\n", len(bytecode.Constants))
-		for i, constant := range bytecode.Constants {
-			fmt.Printf("Constant %d: Type=%d", i, constant.Type)
-			if constant.Type == 7 { // FunctionType
-				fn := constant.AsFunction()
-				fmt.Printf(" [Function: %s params=%d locals=%d]\n", fn.Name, fn.NumParams, fn.NumLocals)
-				fmt.Println("  Function bytecode:")
-				for _, line := range strings.Split(vm.Disassemble(fn.Instructions), "\n") {
-					if line != "" {
-						fmt.Println("   ", line)
-					}
-				}
-			} else {
-				fmt.Printf(" Value=%v\n", constant)
-			}
+	// Compile and run based on backend choice
+	if *backend == "register" {
+		// Register backend
+		fmt.Println("[Register VM - Experimental]")
+		rc := compiler.NewRegisterCompiler()
+		err = rc.CompileToRegister(program)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Register compilation error: %v\n", err)
+			os.Exit(1)
 		}
-		fmt.Println("\n=== Main Bytecode ===")
-		fmt.Println(vm.Disassemble(bytecode.Instructions))
-		fmt.Println()
-	}
 
-	// Run
-	machine := vm.New(bytecode)
-	err = machine.Run()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Runtime error: %v\n", err)
-		os.Exit(1)
-	}
+		registerBytecode := rc.RegisterBytecode()
 
-	// Print result
-	result := machine.LastPoppedStackElem()
-	fmt.Println(result.String())
+		if *debug {
+			fmt.Println("=== Register Bytecode Debug ===")
+			fmt.Printf("Total constants: %d\n", len(registerBytecode.Constants))
+			fmt.Printf("Max registers used: %d\n", rc.MaxRegs)
+			fmt.Printf("Total instructions: %d\n", len(registerBytecode.Instructions))
+			fmt.Println()
+		}
+
+		// Run register VM
+		regVM := vm.NewRegisterVM(registerBytecode)
+		err = regVM.Run()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Register VM runtime error: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Println("Register VM execution complete")
+
+	} else {
+		// Stack backend (default)
+		c := compiler.New()
+		err = c.Compile(program)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Compilation error: %v\n", err)
+			os.Exit(1)
+		}
+
+		bytecode := c.Bytecode()
+
+		// Debug: print bytecode if --debug flag is present
+		if *debug {
+			fmt.Println("=== Stack Bytecode Debug ===")
+			fmt.Printf("Total constants: %d\n", len(bytecode.Constants))
+			for i, constant := range bytecode.Constants {
+				fmt.Printf("Constant %d: Type=%d", i, constant.Type)
+				if constant.Type == 7 { // FunctionType
+					fn := constant.AsFunction()
+					fmt.Printf(" [Function: %s params=%d locals=%d]\n", fn.Name, fn.NumParams, fn.NumLocals)
+					fmt.Println("  Function bytecode:")
+					for _, line := range strings.Split(vm.Disassemble(fn.Instructions), "\n") {
+						if line != "" {
+							fmt.Println("   ", line)
+						}
+					}
+				} else {
+					fmt.Printf(" Value=%v\n", constant)
+				}
+			}
+			fmt.Println("\n=== Main Bytecode ===")
+			fmt.Println(vm.Disassemble(bytecode.Instructions))
+			fmt.Println()
+		}
+
+		// Run stack VM
+		machine := vm.New(bytecode)
+		err = machine.Run()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Runtime error: %v\n", err)
+			os.Exit(1)
+		}
+
+		// Print result
+		result := machine.LastPoppedStackElem()
+		fmt.Println(result.String())
+	}
 }

@@ -502,7 +502,7 @@ func (vm *RegisterVM) callBuiltin(index, argReg, resultReg int) error {
 		}
 	}
 
-	result := builtin.Fn(args...)
+	result := builtin(args...)
 	vm.currentFrame.registers[resultReg] = result
 
 	return nil
