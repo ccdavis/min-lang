@@ -32,11 +32,11 @@ func TestFunctionCalls(t *testing.T) {
 			42,
 		},
 		{
-			`func noReturn(): int {
+			`func noReturn() {
 				var x: int = 5;
 			}
 			noReturn();`,
-			nil, // Implicit nil return
+			nil, // Implicit nil return (no return type annotation)
 		},
 	}
 

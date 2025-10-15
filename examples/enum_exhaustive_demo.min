@@ -1,0 +1,52 @@
+// Exhaustive switch demonstration for enums
+
+type TrafficLight = enum { Red, Yellow, Green }
+
+print("=== Exhaustive Switch (all cases covered) ===");
+var light: int = Red;
+
+// This switch is exhaustive - covers all 3 variants
+switch light {
+case Red {
+    print("Stop!");
+}
+case Yellow {
+    print("Slow down");
+}
+case Green {
+    print("Go");
+}
+}
+
+print("");
+print("=== Switch with Default (always valid) ===");
+type Status = enum { Pending, Active, Completed, Failed }
+
+var status: int = Active;
+switch status {
+case Active {
+    print("Currently active");
+}
+case Completed {
+    print("All done!");
+}
+default {
+    print("Other status");
+}
+}
+
+print("");
+print("=== Non-Enum Switch (requires default) ===");
+var number: int = 42;
+switch number {
+case 1 {
+    print("One");
+}
+case 2 {
+    print("Two");
+}
+default {
+    print("Other number:", number);
+}
+}
+print("Regular int switch completed with default");

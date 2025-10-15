@@ -1192,6 +1192,14 @@ func (c *Compiler) Compile(node ast.Node) error {
 			jumpToEnd = append(jumpToEnd, c.emit(vm.OpJump, 9999))
 		}
 
+		// Check exhaustiveness for enum switches
+		if node.Default == nil {
+			err := c.checkSwitchExhaustiveness(node)
+			if err != nil {
+				return err
+			}
+		}
+
 		// Default case
 		defaultPos := len(c.currentInstructions())
 		c.changeOperand(jumpToDefaultOrEnd, defaultPos)
@@ -1303,4 +1311,85 @@ func (c *Compiler) storeSymbol(s Symbol) {
 	case LocalScope:
 		c.emit(vm.OpStoreLocal, s.Index)
 	}
+}
+
+// checkSwitchExhaustiveness checks if a switch statement on an enum is exhaustive
+func (c *Compiler) checkSwitchExhaustiveness(node *ast.SwitchStatement) error {
+	// Try to determine the enum type of the switch value
+	var enumType *EnumType
+
+	// Check if the switch value is an identifier that's an enum variant
+	if ident, ok := node.Value.(*ast.Identifier); ok {
+		// Check if this identifier is a known enum variant
+		for _, et := range c.enumTypes {
+			for _, variantName := range et.VariantNames {
+				if ident.Value == variantName {
+					// This is an enum variant, but we're switching on the variant itself
+					// which is just an int, not useful for exhaustiveness checking
+					return nil
+				}
+			}
+		}
+
+		// Check if this is a variable that holds an enum value
+		// We need to track which enum type a variable belongs to
+		// For now, we'll use a heuristic: check if all case values are from the same enum
+	}
+
+	// Try to infer enum type from case values
+	// Collect all case values and check if they're all from the same enum
+	caseVariants := make(map[string]bool)
+	var detectedEnumType *EnumType
+
+	for _, caseClause := range node.Cases {
+		if caseIdent, ok := caseClause.Value.(*ast.Identifier); ok {
+			// Check which enum this variant belongs to
+			for _, et := range c.enumTypes {
+				if _, exists := et.Variants[caseIdent.Value]; exists {
+					if detectedEnumType == nil {
+						detectedEnumType = et
+					} else if detectedEnumType.Name != et.Name {
+						// Mixed enums in switch - can't check exhaustiveness
+						return nil
+					}
+					caseVariants[caseIdent.Value] = true
+					break
+				}
+			}
+		}
+	}
+
+	// If we detected an enum type, check exhaustiveness
+	if detectedEnumType != nil {
+		enumType = detectedEnumType
+
+		// Check if all variants are covered
+		missingVariants := []string{}
+		for _, variantName := range enumType.VariantNames {
+			if !caseVariants[variantName] {
+				missingVariants = append(missingVariants, variantName)
+			}
+		}
+
+		if len(missingVariants) > 0 {
+			// Build a helpful error message
+			missing := ""
+			for i, v := range missingVariants {
+				if i > 0 {
+					if i == len(missingVariants)-1 {
+						missing += " and "
+					} else {
+						missing += ", "
+					}
+				}
+				missing += v
+			}
+			return fmt.Errorf("switch on enum %s is not exhaustive, missing cases: %s", enumType.Name, missing)
+		}
+	} else {
+		// Not an enum switch - require a default clause for safety
+		return fmt.Errorf("switch statement must have a default case (or switch on an enum with all variants covered)")
+	}
+
+	return nil
 }

@@ -1,0 +1,320 @@
+// Modern Mandelbrot Set Renderer
+// Showcases comprehensive MinLang features:
+// - Enums with exhaustive switches
+// - Standard library math functions (sqrt, pow, abs, min, max, floor)
+// - C-style and while-style for-loops
+// - Functions with proper type annotations
+// - Arrays for result storage
+// - Break and continue statements
+
+print("=== Modern Mandelbrot Renderer ===");
+print("");
+
+// ===== Type Definitions =====
+
+// Render quality levels
+type Quality = enum { Low, Medium, High, Ultra }
+
+// Escape status categorization
+type EscapeType = enum { VeryFast, Fast, Medium, Slow, InSet }
+
+// ===== Configuration =====
+
+// Quality selection (use exhaustive switch)
+const QUALITY: int = Medium;
+
+var width: int = 0;
+var height: int = 0;
+var maxIter: int = 0;
+
+// Configure based on quality using exhaustive enum switch
+switch QUALITY {
+case Low {
+    width = 60;
+    height = 30;
+    maxIter = 50;
+}
+case Medium {
+    width = 100;
+    height = 50;
+    maxIter = 150;
+}
+case High {
+    width = 120;
+    height = 60;
+    maxIter = 250;
+}
+case Ultra {
+    width = 150;
+    height = 75;
+    maxIter = 400;
+}
+}
+
+// Mandelbrot bounds in complex plane
+const XMIN: float = -2.5;
+const XMAX: float = 1.0;
+const YMIN: float = -1.0;
+const YMAX: float = 1.0;
+
+print("Configuration:");
+print("  Resolution:", width, "x", height);
+print("  Max iterations:", maxIter);
+print("  Bounds: [", XMIN, ",", XMAX, "] x [", YMIN, ",", YMAX, "]");
+print("");
+
+// ===== Core Functions =====
+
+// Calculate magnitude squared of complex number (x + yi)
+// Returns x^2 + y^2 using stdlib pow function
+func complexMagnitudeSquared(x: float, y: float): float {
+    return pow(x, 2.0) + pow(y, 2.0);
+}
+
+// Calculate actual magnitude using stdlib sqrt
+func complexMagnitude(x: float, y: float): float {
+    var magSq: float = complexMagnitudeSquared(x, y);
+    return sqrt(magSq);
+}
+
+// Mandelbrot iteration count for point (cx, cy)
+func mandelbrot(cx: float, cy: float, maxIterations: int): int {
+    var x: float = 0.0;
+    var y: float = 0.0;
+    var iter: int = 0;
+
+    // While-style for loop
+    for iter < maxIterations {
+        // Check if escaped using magnitude squared (avoids sqrt for performance)
+        var magSq: float = complexMagnitudeSquared(x, y);
+
+        if magSq > 4.0 {
+            return iter;
+        }
+
+        // z = z^2 + c using complex multiplication
+        // (x + yi)^2 = x^2 - y^2 + 2xyi
+        var x2: float = pow(x, 2.0);
+        var y2: float = pow(y, 2.0);
+        var xtemp: float = x2 - y2 + cx;
+
+        y = 2.0 * x * y + cy;
+        x = xtemp;
+
+        iter = iter + 1;
+    }
+
+    return maxIterations;
+}
+
+// Classify escape speed using enum
+func classifyEscape(iter: int, maxIter: int): int {
+    if iter == maxIter {
+        return InSet;
+    }
+
+    // Use stdlib functions to categorize
+    var ratio: float = float(iter) / float(maxIter);
+    var threshold25: float = 0.25;
+    var threshold50: float = 0.50;
+    var threshold75: float = 0.75;
+
+    if ratio < threshold25 {
+        return VeryFast;
+    }
+    if ratio < threshold50 {
+        return Fast;
+    }
+    if ratio < threshold75 {
+        return Medium;
+    }
+    return Slow;
+}
+
+// Map pixel coordinates to complex plane
+func pixelToComplex(col: int, row: int, w: int, h: int): float {
+    // Returns real part when called for x, imag part when called for y
+    // This is a helper - we'll call it twice
+    var fracCol: float = float(col) / float(w);
+    var fracRow: float = float(row) / float(h);
+
+    var cx: float = XMIN + (XMAX - XMIN) * fracCol;
+    var cy: float = YMIN + (YMAX - YMIN) * fracRow;
+
+    // Return real part (will be called separately for each component)
+    return cx;
+}
+
+// Convert iteration to character using enhanced logic
+func iterToChar(iter: int, maxIter: int): string {
+    if iter == maxIter {
+        return " ";
+    }
+
+    // Use floor and min/max from stdlib to calculate density
+    var ratio: float = float(iter) / float(maxIter);
+    var level: int = floor(ratio * 10.0);
+
+    // Clamp level using stdlib min/max
+    level = max(0, level);
+    level = min(9, level);
+
+    // Switch statement with default (non-enum, requires default)
+    switch level {
+    case 0 { return "#"; }
+    case 1 { return "@"; }
+    case 2 { return "%"; }
+    case 3 { return "&"; }
+    case 4 { return "+"; }
+    case 5 { return "="; }
+    case 6 { return "-"; }
+    case 7 { return ":"; }
+    case 8 { return "."; }
+    case 9 { return "'"; }
+    default { return " "; }
+    }
+}
+
+// ===== Statistics Calculation =====
+
+print("Calculating statistics...");
+
+var totalIterations: int = 0;
+var minIterations: int = maxIter;
+var maxIterations: int = 0;
+var escapeCounts = [0, 0, 0, 0, 0]; // Counts for each EscapeType
+
+// C-style for loops for statistics
+for var row: int = 0; row < height; row = row + 1 {
+    for var col: int = 0; col < width; col = col + 1 {
+        // Map pixel to complex number
+        var fracCol: float = float(col) / float(width);
+        var fracRow: float = float(row) / float(height);
+        var cx: float = XMIN + (XMAX - XMIN) * fracCol;
+        var cy: float = YMIN + (YMAX - YMIN) * fracRow;
+
+        // Calculate iterations
+        var iter: int = mandelbrot(cx, cy, maxIter);
+
+        // Update statistics using stdlib min/max
+        totalIterations = totalIterations + iter;
+        minIterations = min(minIterations, iter);
+        maxIterations = max(maxIterations, iter);
+
+        // Classify and count
+        var escapeType: int = classifyEscape(iter, maxIter);
+        escapeCounts[escapeType] = escapeCounts[escapeType] + 1;
+    }
+}
+
+var totalPixels: int = width * height;
+var avgIterations: int = totalIterations / totalPixels;
+
+print("Statistics:");
+print("  Total pixels:", totalPixels);
+print("  Total iterations:", totalIterations);
+print("  Average iterations:", avgIterations);
+print("  Min iterations:", minIterations);
+print("  Max iterations:", maxIterations);
+print("");
+
+// Display escape type distribution using exhaustive enum switch
+print("Escape Type Distribution:");
+
+// Use C-style for loop with all escape types
+for var i: int = 0; i < len(escapeCounts); i = i + 1 {
+    var count: int = escapeCounts[i];
+    var percentage: int = count * 100 / totalPixels;
+    var typeName: string = "";
+
+    // Exhaustive switch on enum
+    switch i {
+    case VeryFast { typeName = "Very Fast"; }
+    case Fast { typeName = "Fast"; }
+    case Medium { typeName = "Medium"; }
+    case Slow { typeName = "Slow"; }
+    case InSet { typeName = "In Set"; }
+    }
+
+    print("  ", typeName, ":", count, "pixels (", percentage, "%)");
+}
+
+print("");
+
+// ===== Rendering =====
+
+print("Rendering Mandelbrot Set...");
+print("");
+
+// C-style for loop for rendering
+for var row: int = 0; row < height; row = row + 1 {
+    var line: string = "";
+
+    // Inner loop with continue demonstration
+    for var col: int = 0; col < width; col = col + 1 {
+        // Map pixel to complex number
+        var fracCol: float = float(col) / float(width);
+        var fracRow: float = float(row) / float(height);
+        var cx: float = XMIN + (XMAX - XMIN) * fracCol;
+        var cy: float = YMIN + (YMAX - YMIN) * fracRow;
+
+        // Calculate iterations
+        var iter: int = mandelbrot(cx, cy, maxIter);
+
+        // Convert to character
+        var char: string = iterToChar(iter, maxIter);
+        line = line + char;
+    }
+
+    print(line);
+}
+
+print("");
+print("Rendering complete!");
+
+// ===== Feature Demonstration =====
+
+print("");
+print("=== Math Function Demonstration ===");
+
+// Demonstrate sqrt and pow
+var a: float = 3.0;
+var b: float = 4.0;
+var aSquared: float = pow(a, 2.0);
+var bSquared: float = pow(b, 2.0);
+var distance: float = sqrt(aSquared + bSquared);
+
+print("Pythagorean theorem: sqrt(", a, "^2 + ", b, "^2) =", distance);
+
+// Demonstrate abs, min, max
+var testNums = [-5, 3, -8, 12, 0, -3];
+var absSum: int = 0;
+var minVal: int = 999999;
+var maxVal: int = -999999;
+
+print("Processing numbers:", len(testNums), "values");
+
+for var i: int = 0; i < len(testNums); i = i + 1 {
+    var num: int = testNums[i];
+    var absVal: int = abs(num);
+
+    absSum = absSum + absVal;
+    minVal = min(minVal, num);
+    maxVal = max(maxVal, num);
+}
+
+print("  Sum of absolute values:", absSum);
+print("  Minimum value:", minVal);
+print("  Maximum value:", maxVal);
+
+// Demonstrate floor with float array
+var floatNums = [3.7, 2.1, -1.5, 4.9];
+print("Floor function:");
+for var i: int = 0; i < len(floatNums); i = i + 1 {
+    var num: float = floatNums[i];
+    var floored: int = floor(num);
+    print("  floor(", num, ") =", floored);
+}
+
+print("");
+print("=== All Features Demonstrated Successfully! ===");

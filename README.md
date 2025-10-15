@@ -10,7 +10,7 @@ A fast, educational programming language with a stack-based virtual machine. Min
 - **Control flow**: `if/else`, `for` loops, `break`, `continue`, `switch/case`
 - **Variables**: Immutable (`const`) and mutable (`var`) bindings
 - **Operators**: Full arithmetic, comparison, and logical operators
-- **Built-in functions**: `print`, `len`, `push`, `pop`, `keys`
+- **Built-in functions**: Math (`abs`, `min`, `max`, `sqrt`, `pow`, `floor`, `ceil`), String (`split`, `substring`), Collections (`len`, `append`, `keys`, `values`, `copy`, `delete`), Type conversion (`int`, `float`, `string`), and more
 
 ## Performance
 
@@ -179,6 +179,7 @@ The `examples/` directory contains:
 - `fibonacci.min` - Fibonacci sequence
 - `mandelbrot_heavy.min` - Performance benchmark (122M iterations)
 - `comprehensive_demo.min` - All language features
+- `stdlib_demo.min` - Standard library functions showcase
 
 ## Benchmarks
 

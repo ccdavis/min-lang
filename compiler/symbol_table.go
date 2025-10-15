@@ -44,6 +44,18 @@ func NewSymbolTable() *SymbolTable {
 	st.DefineBuiltin(6, "copy")
 	st.DefineBuiltin(7, "enumName")
 	st.DefineBuiltin(8, "enumValue")
+	st.DefineBuiltin(9, "abs")
+	st.DefineBuiltin(10, "min")
+	st.DefineBuiltin(11, "max")
+	st.DefineBuiltin(12, "sqrt")
+	st.DefineBuiltin(13, "pow")
+	st.DefineBuiltin(14, "floor")
+	st.DefineBuiltin(15, "ceil")
+	st.DefineBuiltin(16, "split")
+	st.DefineBuiltin(17, "substring")
+	st.DefineBuiltin(18, "int")
+	st.DefineBuiltin(19, "float")
+	st.DefineBuiltin(20, "string")
 
 	return st
 }

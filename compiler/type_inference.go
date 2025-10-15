@@ -111,8 +111,43 @@ func (c *Compiler) inferExpressionType(node ast.Expression) vm.ValueType {
 		return c.inferExpressionType(n.Right)
 
 	case *ast.CallExpression:
-		// Function calls - we'd need to track return types
-		// For now, default to int
+		// Check if it's a known builtin function with a specific return type
+		if ident, ok := n.Function.(*ast.Identifier); ok {
+			switch ident.Value {
+			// Math functions that return float
+			case "sqrt", "pow", "abs", "min", "max":
+				// If any argument is float, result is float
+				for _, arg := range n.Arguments {
+					if c.inferExpressionType(arg) == vm.FloatType {
+						return vm.FloatType
+					}
+				}
+				// abs/min/max with int arguments return int
+				if ident.Value == "abs" || ident.Value == "min" || ident.Value == "max" {
+					return vm.IntType
+				}
+				// sqrt and pow always return float
+				return vm.FloatType
+			case "floor", "ceil":
+				return vm.IntType
+			case "float":
+				return vm.FloatType
+			case "int":
+				return vm.IntType
+			case "string":
+				return vm.StringType
+			case "split", "keys", "values", "append", "copy":
+				return vm.ArrayType
+			case "len":
+				return vm.IntType
+			// User-defined functions - check function signature
+			default:
+				if funcType, ok := c.functionSigs[ident.Value]; ok {
+					return convertToValueType(funcType.ReturnType)
+				}
+			}
+		}
+		// Default to int for unknown functions
 		return vm.IntType
 
 	case *ast.ArrayLiteral:

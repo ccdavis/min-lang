@@ -1,0 +1,120 @@
+// Standard Library Functions Demo
+
+print("=== Math Functions ===");
+
+// abs - absolute value
+print("abs(-5):", abs(-5));
+print("abs(3.14):", abs(3.14));
+print("abs(-2.5):", abs(-2.5));
+print("");
+
+// min and max
+print("min(10, 20):", min(10, 20));
+print("max(10, 20):", max(10, 20));
+print("min(3.14, 2.71):", min(3.14, 2.71));
+print("max(3.14, 2.71):", max(3.14, 2.71));
+print("");
+
+// sqrt - square root
+print("sqrt(16):", sqrt(16));
+print("sqrt(2):", sqrt(2));
+print("sqrt(100):", sqrt(100));
+print("");
+
+// pow - power
+print("pow(2, 3):", pow(2, 3));
+print("pow(10, 2):", pow(10, 2));
+print("pow(5, 0):", pow(5, 0));
+print("");
+
+// floor and ceil
+print("floor(3.7):", floor(3.7));
+print("ceil(3.2):", ceil(3.2));
+print("floor(-2.3):", floor(-2.3));
+print("ceil(-2.3):", ceil(-2.3));
+print("");
+
+print("=== String Functions ===");
+
+// split - split string into array
+var sentence: string = "Hello world from MinLang";
+var words = split(sentence, " ");
+print("Split by space:", len(words), "words");
+print("First word:", words[0]);
+print("Last word:", words[3]);
+print("");
+
+var csv: string = "apple,banana,orange";
+var fruits = split(csv, ",");
+print("Split by comma:", len(fruits), "items");
+for var i: int = 0; i < len(fruits); i = i + 1 {
+    print("  -", fruits[i]);
+}
+print("");
+
+// substring - extract substring
+var text: string = "MinLang is awesome!";
+print("Original:", text);
+print("substring(0, 7):", substring(text, 0, 7));
+print("substring(11, 18):", substring(text, 11, 18));
+print("substring(3, 7):", substring(text, 3, 7));
+print("");
+
+print("=== Type Conversion ===");
+
+// int conversion
+print("int(3.14):", int(3.14));
+print("int(\"42\"):", int("42"));
+print("int(\"-123\"):", int("-123"));
+print("int(true):", int(true));
+print("int(false):", int(false));
+print("");
+
+// float conversion
+print("float(42):", float(42));
+print("float(\"3.14\"):", float("3.14"));
+print("float(\"-2.5\"):", float("-2.5"));
+print("float(true):", float(true));
+print("");
+
+// string conversion
+print("string(42):", string(42));
+print("string(3.14):", string(3.14));
+print("string(true):", string(true));
+print("");
+
+print("=== Practical Examples ===");
+
+// Calculate distance using Pythagorean theorem
+var a: float = 3.0;
+var b: float = 4.0;
+var aSquared = pow(a, 2);
+var bSquared = pow(b, 2);
+var sumOfSquares = aSquared + bSquared;
+var c: float = sqrt(sumOfSquares);
+print("Distance (3, 4):", c);
+print("");
+
+// Process temperatures
+var temps: []float = [23.7, 18.2, 25.9, 21.3, 19.8];
+print("Temperature processing:");
+for var i: int = 0; i < len(temps); i = i + 1 {
+    var temp = temps[i];
+    print("  Temp", i + 1, ":", floor(temp), "to", ceil(temp));
+}
+print("");
+
+// String processing
+var data: string = "100,200,300,400";
+var parts = split(data, ",");
+var sum: int = 0;
+print("Parsing CSV data:");
+for var i: int = 0; i < len(parts); i = i + 1 {
+    var num = int(parts[i]);
+    sum = sum + num;
+    print("  Number", i + 1, ":", num);
+}
+print("Total sum:", sum);
+print("");
+
+print("=== Demo Complete ===");
