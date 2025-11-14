@@ -1,0 +1,35 @@
+// Test 1: Simple function with no parameters
+func greet(): nil {
+    print("Hello from function!");
+}
+
+greet();
+
+// Test 2: Function with parameters and return value
+func add(a: int, b: int): int {
+    return a + b;
+}
+
+var result: int = add(5, 3);
+print("5 + 3 =", result);
+
+// Test 3: Function with multiple operations
+func multiply_and_add(x: int, y: int, z: int): int {
+    var temp: int = x * y;
+    return temp + z;
+}
+
+var result2: int = multiply_and_add(4, 5, 10);
+print("4 * 5 + 10 =", result2);
+
+// Test 4: Nested function calls
+func double(n: int): int {
+    return n * 2;
+}
+
+func quadruple(n: int): int {
+    return double(double(n));
+}
+
+var result3: int = quadruple(7);
+print("quadruple(7) =", result3);

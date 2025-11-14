@@ -1,0 +1,19 @@
+// Simple test for register VM
+var x: int = 5
+var y: int = 3
+var sum: int = x + y
+var prod: int = x * y
+
+// Comparisons
+var result: bool = x > y
+
+// For loop
+var total: int = 0
+for var i: int = 0; i < 10; i = i + 1 {
+    total = total + i
+}
+
+// If statement
+if total > 40 {
+    var msg: string = "Total is greater than 40"
+}

@@ -1,0 +1,5 @@
+// Simple benchmark without print
+var total: int = 0
+for var i: int = 0; i < 10000000; i = i + 1 {
+    total = total + i
+}
