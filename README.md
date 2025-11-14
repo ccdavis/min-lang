@@ -17,7 +17,7 @@ Everything else here is all Claude Code, for better or worse.
 
 # MinLang
 
-A fast, educational programming language with a stack-based virtual machine. MinLang demonstrates modern compiler optimization techniques while maintaining clean, readable code.
+A fast, educational programming language with register-based and stack-based virtual machines. MinLang demonstrates modern compiler optimization techniques while maintaining clean, readable code.
 
 ## Features
 
@@ -84,7 +84,7 @@ minlang/
 ├── parser/      # Syntax analysis (AST generation)
 ├── ast/         # Abstract Syntax Tree definitions
 ├── compiler/    # Code generation (bytecode + optimizations)
-├── vm/          # Virtual machine (stack-based interpreter)
+├── vm/          # Virtual machines (register-based and stack-based)
 ├── cmd/minlang/ # Main executable
 ├── examples/    # Example programs
 └── benchmarks/  # Performance benchmarks vs Python, C, Go
@@ -99,7 +99,8 @@ minlang/
 - Constant folding ready
 
 ### Virtual Machine
-- Stack-based architecture (2048-value stack)
+- **Register-based VM** (default): Type-specialized opcodes, zero runtime type checks, direct register operations
+- **Stack-based VM**: Traditional stack architecture (2048-value stack) for comparison
 - Frame pooling (pre-allocated call frames)
 - Tagged union values (8-byte, no heap allocation for primitives)
 - Computed dispatch with embedded closures
@@ -112,7 +113,7 @@ minlang/
 
 ## Language Reference
 
-See [GRAMMAR.md](GRAMMAR.md) for complete syntax specification.
+See [GRAMMAR.md](docs/GRAMMAR.md) for complete syntax specification.
 
 ### Variable Declarations
 ```javascript
@@ -231,7 +232,7 @@ time ./minlang examples/mandelbrot_heavy.min
 ```
 
 ### Performance Analysis
-See [PERFORMANCE.md](PERFORMANCE.md) for:
+See [PERFORMANCE.md](examples/PERFORMANCE.md) for:
 - Detailed optimization breakdown
 - GC pressure analysis
 - Future optimization opportunities
