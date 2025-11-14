@@ -1,3 +1,20 @@
+## Intro
+
+I created this language and the interpreters on a whim to see how far Claude Code could get me without really trying.  It's my only real "Vibe coded" project of any size. I only read the explanations of what Claude was planning to do and a few diffs it showed me, never even opening an editor. I don't actually recommend this approach.
+
+I was pretty surprised how  competent Claude was. It helps I've made a couple of hobby or toy languages so I at least understand interpreters and compilers and know the terminology. Still I'm quite impressed with how much CC did on its own. This project would have taken me months on my own.
+
+The whole thing took a few hours of my time. Half of that was browsing the internet while I waited.
+
+I had Claude use Go-lang because
+* It's statically typed so theAI gets more feedback to guide it as it builds
+* Compile times are fast so Claude could iterate faster
+* Interesting to code in a language I'm less familiar with. I know it, but I don't use it much.
+* The interpreters could lean on the large Go runtime and standard library if I decided to make a standard library for Min-lang
+
+Everything else here is all Claude Code, for better or worse.
+
+
 # MinLang
 
 A fast, educational programming language with a stack-based virtual machine. MinLang demonstrates modern compiler optimization techniques while maintaining clean, readable code.
@@ -14,15 +31,16 @@ A fast, educational programming language with a stack-based virtual machine. Min
 
 ## Performance
 
-MinLang achieves **~33% of Python's speed** through aggressive optimizations:
+MinLang achieves **~75% of Python's speed** with the register-based VM through aggressive optimizations:
 
-- Tagged union values (zero boxing overhead)
-- Direct local operations (peephole optimization)
-- Frame pooling and embedded closures (zero-allocation function calls)
-- String interning (memory deduplication)
-- Pre-allocated errors (no error path allocations)
+- **Register-based VM**: Type-specialized opcodes, zero runtime type checks
+- **Tagged union values**: Zero boxing overhead for primitives
+- **Direct operations**: Peephole optimization eliminates redundant instructions
+- **Frame pooling**: Zero-allocation function calls with embedded closures
+- **String interning**: Memory deduplication across the program
+- **Pre-allocated errors**: No allocations on error paths
 
-See [PERFORMANCE.md](PERFORMANCE.md) for detailed analysis.
+The original stack-based VM achieves ~49% of Python's speed and remains available for comparison.
 
 ## Quick Start
 
@@ -183,20 +201,22 @@ The `examples/` directory contains:
 
 ## Benchmarks
 
-Performance on heavy Mandelbrot benchmark (82M-122M iterations):
+Performance on heavy Mandelbrot benchmark (~82M iterations):
 
 | Language | Time | Iterations/sec | Relative to Python |
 |----------|------|----------------|---------------------|
-| Python 3 | 5.3s | 23.1M/s | 1.00× (baseline) |
-| Ruby 3 | 5.8s | 21.0M/s | 0.91× (91% of Python) |
-| MinLang | 10.7s | 7.7M/s | 0.33× (33% of Python) |
+| Python 3 | 5.3s | 15.6M/s | 1.00× (baseline) |
+| MinLang (register) | 7.1s | 11.6M/s | 0.75× (75% of Python) |
+| Ruby 3 | 5.8s | 14.2M/s | 0.91× (91% of Python) |
+| MinLang (stack) | 10.8s | 7.6M/s | 0.49× (49% of Python) |
 
 **Comparison summary:**
-- Python and Ruby are nearly identical in performance (Ruby is 91% of Python's speed)
-- MinLang achieves 33% of Python's performance, which is respectable for an educational bytecode interpreter without JIT compilation
-- MinLang is 37% the speed of Ruby
+- **Register VM** achieves 75% of Python's performance - excellent for a bytecode interpreter without JIT
+- Python and Ruby remain closely matched (Ruby is 91% of Python's speed)
+- **Stack VM** achieves 49% of Python's performance, demonstrating the benefit of register-based architecture
+- The register VM is **53% faster** than the stack VM (7.1s vs 10.8s)
 
-All benchmarks use pure native code with no external libraries or optimizations.
+All benchmarks use pure native code with no external libraries or optimizations. Use `--backend=register` (default) or `--backend=stack` to select the VM.
 
 ## Development
 

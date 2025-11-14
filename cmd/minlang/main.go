@@ -14,7 +14,7 @@ import (
 
 func main() {
 	// Define flags
-	backend := flag.String("backend", "stack", "VM backend: stack or register")
+	backend := flag.String("backend", "register", "VM backend: stack or register")
 	debug := flag.Bool("debug", false, "Print bytecode debug information")
 	cpuprofile := flag.String("cpuprofile", "", "Write CPU profile to file")
 	flag.Parse()
@@ -68,7 +68,6 @@ func main() {
 	// Compile and run based on backend choice
 	if *backend == "register" {
 		// Register backend
-		fmt.Println("[Register VM - Experimental]")
 		rc := compiler.NewRegisterCompiler()
 		_, err = rc.CompileToRegister(program)
 		if err != nil {
@@ -93,8 +92,6 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Register VM runtime error: %v\n", err)
 			os.Exit(1)
 		}
-
-		fmt.Println("Register VM execution complete")
 
 	} else {
 		// Stack backend (default)
