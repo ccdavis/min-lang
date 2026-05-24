@@ -1,0 +1,58 @@
+// Text File I/O Demo
+
+print("=== Writing text file ===");
+var f = fopen("/tmp/minlang_test.txt", "w");
+if f == nil {
+    print("ERROR: Could not open file for writing");
+    exit(1);
+}
+fwriteln(f, "Line 1: Hello from MinLang!");
+fwriteln(f, "Line 2: Text file I/O works.");
+fwriteln(f, "Line 3: This is the last line.");
+fclose(f);
+print("Wrote 3 lines");
+
+print("");
+print("=== Reading text file ===");
+var f = fopen("/tmp/minlang_test.txt", "r");
+if f == nil {
+    print("ERROR: Could not open file for reading");
+    exit(1);
+}
+var lineNum = 1;
+for !feof(f) {
+    var line = fread(f);
+    if line != nil {
+        print("  [" + string(lineNum) + "] " + line);
+        lineNum = lineNum + 1;
+    }
+}
+fclose(f);
+
+print("");
+print("=== Appending to file ===");
+var f = fopen("/tmp/minlang_test.txt", "a");
+fwriteln(f, "Line 4: Appended!");
+fclose(f);
+
+print("");
+print("=== Reading entire file ===");
+var content = readFile("/tmp/minlang_test.txt");
+print(content);
+
+print("=== writeFile / readFile convenience ===");
+writeFile("/tmp/minlang_test2.txt", "Quick write test");
+var result = readFile("/tmp/minlang_test2.txt");
+print("Read back: " + result);
+
+print("");
+print("=== typeof for file handles ===");
+var f = fopen("/tmp/minlang_test.txt", "r");
+print("Type of file handle:", typeof(f));
+print("Type of string:", typeof("hello"));
+print("Type of int:", typeof(42));
+print("Type of nil:", typeof(nil));
+fclose(f);
+
+print("");
+print("=== Done ===");

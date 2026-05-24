@@ -2,11 +2,16 @@ package vm
 
 import (
 	"fmt"
+	"os"
 	"unsafe"
 )
 
 // BuiltinFunction represents a built-in function
 type BuiltinFunction func(args ...Value) Value
+
+func printError(format string, a ...interface{}) {
+	fmt.Fprintf(os.Stderr, format+"\n", a...)
+}
 
 // Builtins is a list of built-in functions
 var Builtins = []BuiltinFunction{
@@ -31,6 +36,39 @@ var Builtins = []BuiltinFunction{
 	intBuiltin,
 	floatBuiltin,
 	stringBuiltin,
+	// String functions (21-32)
+	trimBuiltin,
+	upperBuiltin,
+	lowerBuiltin,
+	containsBuiltin,
+	indexOfBuiltin,
+	replaceBuiltin,
+	startsWithBuiltin,
+	endsWithBuiltin,
+	joinBuiltin,
+	repeatBuiltin,
+	charBuiltin,
+	ordBuiltin,
+	// Console I/O (33-36)
+	writeBuiltin,
+	eprintBuiltin,
+	ewriteBuiltin,
+	readlnBuiltin,
+	// File I/O (37-47)
+	fopenBuiltin,
+	fcloseBuiltin,
+	freadBuiltin,
+	fwriteBuiltin,
+	fwritelnBuiltin,
+	feofBuiltin,
+	fseekBuiltin,
+	ftellBuiltin,
+	fsizeBuiltin,
+	readFileBuiltin,
+	writeFileBuiltin,
+	// Utility (48-49)
+	typeofBuiltin,
+	exitBuiltin,
 }
 
 // EnumRegistry stores enum type information at runtime
@@ -51,7 +89,7 @@ func printBuiltin(args ...Value) Value {
 // lenBuiltin implements the len function
 func lenBuiltin(args ...Value) Value {
 	if len(args) != 1 {
-		fmt.Printf("len: wrong number of arguments. got=%d, want=1\n", len(args))
+		printError("len: wrong number of arguments. got=%d, want=1", len(args))
 		return NilValue()
 	}
 
@@ -64,7 +102,7 @@ func lenBuiltin(args ...Value) Value {
 	case StringType:
 		return IntValue(int64(len(arg.AsString())))
 	default:
-		fmt.Printf("len: argument not supported for type %d\n", arg.Type)
+		printError("len: argument not supported for type %d", arg.Type)
 		return NilValue()
 	}
 }
@@ -72,7 +110,7 @@ func lenBuiltin(args ...Value) Value {
 // deleteBuiltin implements the delete function for maps
 func deleteBuiltin(args ...Value) Value {
 	if len(args) != 2 {
-		fmt.Printf("delete: wrong number of arguments. got=%d, want=2\n", len(args))
+		printError("delete: wrong number of arguments. got=%d, want=2", len(args))
 		return NilValue()
 	}
 
@@ -80,7 +118,7 @@ func deleteBuiltin(args ...Value) Value {
 	key := args[1]
 
 	if mapVal.Type != MapType {
-		fmt.Printf("delete: first argument must be a map\n")
+		printError("delete: first argument must be a map")
 		return NilValue()
 	}
 
@@ -94,13 +132,13 @@ func deleteBuiltin(args ...Value) Value {
 // appendBuiltin implements the append function for arrays
 func appendBuiltin(args ...Value) Value {
 	if len(args) < 2 {
-		fmt.Printf("append: wrong number of arguments. got=%d, want=2+\n", len(args))
+		printError("append: wrong number of arguments. got=%d, want=2+", len(args))
 		return NilValue()
 	}
 
 	arrayVal := args[0]
 	if arrayVal.Type != ArrayType {
-		fmt.Printf("append: first argument must be an array\n")
+		printError("append: first argument must be an array")
 		return NilValue()
 	}
 
@@ -116,8 +154,8 @@ func appendBuiltin(args ...Value) Value {
 	}
 
 	arr := &ArrayValue{Elements: newElements}
-	// Add to pool to keep it alive for GC (critical - without this the pointer becomes dangling!)
 	arrayPool = append(arrayPool, arr)
+	trimPool(&arrayPool)
 	return Value{
 		Type: ArrayType,
 		Data: uint64(uintptr(unsafe.Pointer(arr))),
@@ -127,13 +165,13 @@ func appendBuiltin(args ...Value) Value {
 // keysBuiltin implements the keys function for maps
 func keysBuiltin(args ...Value) Value {
 	if len(args) != 1 {
-		fmt.Printf("keys: wrong number of arguments. got=%d, want=1\n", len(args))
+		printError("keys: wrong number of arguments. got=%d, want=1", len(args))
 		return NilValue()
 	}
 
 	mapVal := args[0]
 	if mapVal.Type != MapType {
-		fmt.Printf("keys: argument must be a map\n")
+		printError("keys: argument must be a map")
 		return NilValue()
 	}
 
@@ -149,8 +187,8 @@ func keysBuiltin(args ...Value) Value {
 	}
 
 	arr := &ArrayValue{Elements: keys}
-	// Add to pool to keep it alive for GC
 	arrayPool = append(arrayPool, arr)
+	trimPool(&arrayPool)
 	return Value{
 		Type: ArrayType,
 		Data: uint64(uintptr(unsafe.Pointer(arr))),
@@ -160,13 +198,13 @@ func keysBuiltin(args ...Value) Value {
 // valuesBuiltin implements the values function for maps
 func valuesBuiltin(args ...Value) Value {
 	if len(args) != 1 {
-		fmt.Printf("values: wrong number of arguments. got=%d, want=1\n", len(args))
+		printError("values: wrong number of arguments. got=%d, want=1", len(args))
 		return NilValue()
 	}
 
 	mapVal := args[0]
 	if mapVal.Type != MapType {
-		fmt.Printf("values: argument must be a map\n")
+		printError("values: argument must be a map")
 		return NilValue()
 	}
 
@@ -178,8 +216,8 @@ func valuesBuiltin(args ...Value) Value {
 	}
 
 	arr := &ArrayValue{Elements: values}
-	// Add to pool to keep it alive for GC
 	arrayPool = append(arrayPool, arr)
+	trimPool(&arrayPool)
 	return Value{
 		Type: ArrayType,
 		Data: uint64(uintptr(unsafe.Pointer(arr))),
@@ -189,13 +227,13 @@ func valuesBuiltin(args ...Value) Value {
 // copyBuiltin implements the copy function for arrays
 func copyBuiltin(args ...Value) Value {
 	if len(args) != 1 {
-		fmt.Printf("copy: wrong number of arguments. got=%d, want=1\n", len(args))
+		printError("copy: wrong number of arguments. got=%d, want=1", len(args))
 		return NilValue()
 	}
 
 	arrayVal := args[0]
 	if arrayVal.Type != ArrayType {
-		fmt.Printf("copy: argument must be an array\n")
+		printError("copy: argument must be an array")
 		return NilValue()
 	}
 
@@ -204,8 +242,8 @@ func copyBuiltin(args ...Value) Value {
 	copy(newElements, oldArray.Elements)
 
 	arr := &ArrayValue{Elements: newElements}
-	// Add to pool to keep it alive for GC
 	arrayPool = append(arrayPool, arr)
+	trimPool(&arrayPool)
 	return Value{
 		Type: ArrayType,
 		Data: uint64(uintptr(unsafe.Pointer(arr))),
@@ -215,7 +253,7 @@ func copyBuiltin(args ...Value) Value {
 // enumNameBuiltin implements enumName(enumType, value) -> string
 func enumNameBuiltin(args ...Value) Value {
 	if len(args) != 2 {
-		fmt.Printf("enumName: wrong number of arguments. got=%d, want=2\n", len(args))
+		printError("enumName: wrong number of arguments. got=%d, want=2", len(args))
 		return NilValue()
 	}
 
@@ -223,12 +261,12 @@ func enumNameBuiltin(args ...Value) Value {
 	enumValue := args[1]
 
 	if enumTypeName.Type != StringType {
-		fmt.Printf("enumName: first argument must be string (enum type name)\n")
+		printError("enumName: first argument must be string (enum type name)")
 		return NilValue()
 	}
 
 	if enumValue.Type != IntType {
-		fmt.Printf("enumName: second argument must be int (enum value)\n")
+		printError("enumName: second argument must be int (enum value)")
 		return NilValue()
 	}
 
@@ -238,14 +276,14 @@ func enumNameBuiltin(args ...Value) Value {
 	// Look up enum type in registry
 	enumType, ok := EnumRegistry[typeName]
 	if !ok {
-		fmt.Printf("enumName: unknown enum type '%s'\n", typeName)
+		printError("enumName: unknown enum type '%s'", typeName)
 		return NilValue()
 	}
 
 	// Look up variant name
 	name, ok := enumType[value]
 	if !ok {
-		fmt.Printf("enumName: invalid value %d for enum type '%s'\n", value, typeName)
+		printError("enumName: invalid value %d for enum type '%s'", value, typeName)
 		return NilValue()
 	}
 
@@ -255,7 +293,7 @@ func enumNameBuiltin(args ...Value) Value {
 // enumValueBuiltin implements enumValue(enumType, name) -> int or error
 func enumValueBuiltin(args ...Value) Value {
 	if len(args) != 2 {
-		fmt.Printf("enumValue: wrong number of arguments. got=%d, want=2\n", len(args))
+		printError("enumValue: wrong number of arguments. got=%d, want=2", len(args))
 		return NilValue()
 	}
 
@@ -263,12 +301,12 @@ func enumValueBuiltin(args ...Value) Value {
 	variantName := args[1]
 
 	if enumTypeName.Type != StringType {
-		fmt.Printf("enumValue: first argument must be string (enum type name)\n")
+		printError("enumValue: first argument must be string (enum type name)")
 		return NilValue()
 	}
 
 	if variantName.Type != StringType {
-		fmt.Printf("enumValue: second argument must be string (variant name)\n")
+		printError("enumValue: second argument must be string (variant name)")
 		return NilValue()
 	}
 
@@ -278,7 +316,7 @@ func enumValueBuiltin(args ...Value) Value {
 	// Look up enum type in registry
 	enumType, ok := EnumRegistry[typeName]
 	if !ok {
-		fmt.Printf("enumValue: unknown enum type '%s'\n", typeName)
+		printError("enumValue: unknown enum type '%s'", typeName)
 		return NilValue()
 	}
 
@@ -289,14 +327,14 @@ func enumValueBuiltin(args ...Value) Value {
 		}
 	}
 
-	fmt.Printf("enumValue: unknown variant '%s' for enum type '%s'\n", name, typeName)
+	printError("enumValue: unknown variant '%s' for enum type '%s'", name, typeName)
 	return NilValue()
 }
 
 // absBuiltin implements abs(n) - absolute value
 func absBuiltin(args ...Value) Value {
 	if len(args) != 1 {
-		fmt.Printf("abs: wrong number of arguments. got=%d, want=1\n", len(args))
+		printError("abs: wrong number of arguments. got=%d, want=1", len(args))
 		return NilValue()
 	}
 
@@ -315,7 +353,7 @@ func absBuiltin(args ...Value) Value {
 		}
 		return arg
 	default:
-		fmt.Printf("abs: argument must be int or float\n")
+		printError("abs: argument must be int or float")
 		return NilValue()
 	}
 }
@@ -323,7 +361,7 @@ func absBuiltin(args ...Value) Value {
 // minBuiltin implements min(a, b) - minimum of two numbers
 func minBuiltin(args ...Value) Value {
 	if len(args) != 2 {
-		fmt.Printf("min: wrong number of arguments. got=%d, want=2\n", len(args))
+		printError("min: wrong number of arguments. got=%d, want=2", len(args))
 		return NilValue()
 	}
 
@@ -357,14 +395,14 @@ func minBuiltin(args ...Value) Value {
 		return FloatValue(bFloat)
 	}
 
-	fmt.Printf("min: arguments must be int or float\n")
+	printError("min: arguments must be int or float")
 	return NilValue()
 }
 
 // maxBuiltin implements max(a, b) - maximum of two numbers
 func maxBuiltin(args ...Value) Value {
 	if len(args) != 2 {
-		fmt.Printf("max: wrong number of arguments. got=%d, want=2\n", len(args))
+		printError("max: wrong number of arguments. got=%d, want=2", len(args))
 		return NilValue()
 	}
 
@@ -398,14 +436,14 @@ func maxBuiltin(args ...Value) Value {
 		return FloatValue(bFloat)
 	}
 
-	fmt.Printf("max: arguments must be int or float\n")
+	printError("max: arguments must be int or float")
 	return NilValue()
 }
 
 // sqrtBuiltin implements sqrt(n) - square root
 func sqrtBuiltin(args ...Value) Value {
 	if len(args) != 1 {
-		fmt.Printf("sqrt: wrong number of arguments. got=%d, want=1\n", len(args))
+		printError("sqrt: wrong number of arguments. got=%d, want=1", len(args))
 		return NilValue()
 	}
 
@@ -418,12 +456,12 @@ func sqrtBuiltin(args ...Value) Value {
 	case FloatType:
 		val = arg.AsFloat()
 	default:
-		fmt.Printf("sqrt: argument must be int or float\n")
+		printError("sqrt: argument must be int or float")
 		return NilValue()
 	}
 
 	if val < 0 {
-		fmt.Printf("sqrt: argument must be non-negative\n")
+		printError("sqrt: argument must be non-negative")
 		return NilValue()
 	}
 
@@ -443,7 +481,7 @@ func sqrtBuiltin(args ...Value) Value {
 // powBuiltin implements pow(base, exp) - power
 func powBuiltin(args ...Value) Value {
 	if len(args) != 2 {
-		fmt.Printf("pow: wrong number of arguments. got=%d, want=2\n", len(args))
+		printError("pow: wrong number of arguments. got=%d, want=2", len(args))
 		return NilValue()
 	}
 
@@ -458,7 +496,7 @@ func powBuiltin(args ...Value) Value {
 	case FloatType:
 		baseFloat = base.AsFloat()
 	default:
-		fmt.Printf("pow: base must be int or float\n")
+		printError("pow: base must be int or float")
 		return NilValue()
 	}
 
@@ -469,7 +507,7 @@ func powBuiltin(args ...Value) Value {
 	case FloatType:
 		expFloat = exp.AsFloat()
 	default:
-		fmt.Printf("pow: exponent must be int or float\n")
+		printError("pow: exponent must be int or float")
 		return NilValue()
 	}
 
@@ -485,14 +523,14 @@ func powBuiltin(args ...Value) Value {
 
 	// For non-integer or negative exponents, we'd need a full math library
 	// For now, just handle simple cases
-	fmt.Printf("pow: only non-negative integer exponents are supported\n")
+	printError("pow: only non-negative integer exponents are supported")
 	return NilValue()
 }
 
 // floorBuiltin implements floor(n) - round down
 func floorBuiltin(args ...Value) Value {
 	if len(args) != 1 {
-		fmt.Printf("floor: wrong number of arguments. got=%d, want=1\n", len(args))
+		printError("floor: wrong number of arguments. got=%d, want=1", len(args))
 		return NilValue()
 	}
 
@@ -505,7 +543,7 @@ func floorBuiltin(args ...Value) Value {
 	case FloatType:
 		val = arg.AsFloat()
 	default:
-		fmt.Printf("floor: argument must be int or float\n")
+		printError("floor: argument must be int or float")
 		return NilValue()
 	}
 
@@ -521,7 +559,7 @@ func floorBuiltin(args ...Value) Value {
 // ceilBuiltin implements ceil(n) - round up
 func ceilBuiltin(args ...Value) Value {
 	if len(args) != 1 {
-		fmt.Printf("ceil: wrong number of arguments. got=%d, want=1\n", len(args))
+		printError("ceil: wrong number of arguments. got=%d, want=1", len(args))
 		return NilValue()
 	}
 
@@ -534,7 +572,7 @@ func ceilBuiltin(args ...Value) Value {
 	case FloatType:
 		val = arg.AsFloat()
 	default:
-		fmt.Printf("ceil: argument must be int or float\n")
+		printError("ceil: argument must be int or float")
 		return NilValue()
 	}
 
@@ -550,7 +588,7 @@ func ceilBuiltin(args ...Value) Value {
 // splitBuiltin implements split(str, separator) - split string into array
 func splitBuiltin(args ...Value) Value {
 	if len(args) != 2 {
-		fmt.Printf("split: wrong number of arguments. got=%d, want=2\n", len(args))
+		printError("split: wrong number of arguments. got=%d, want=2", len(args))
 		return NilValue()
 	}
 
@@ -558,12 +596,12 @@ func splitBuiltin(args ...Value) Value {
 	sep := args[1]
 
 	if str.Type != StringType {
-		fmt.Printf("split: first argument must be string\n")
+		printError("split: first argument must be string")
 		return NilValue()
 	}
 
 	if sep.Type != StringType {
-		fmt.Printf("split: second argument must be string\n")
+		printError("split: second argument must be string")
 		return NilValue()
 	}
 
@@ -571,9 +609,10 @@ func splitBuiltin(args ...Value) Value {
 	sepVal := sep.AsString()
 
 	if sepVal == "" {
-		// Split into individual characters
-		elements := make([]Value, len(strVal))
-		for i, ch := range strVal {
+		// Split into individual characters (rune-aware)
+		runes := []rune(strVal)
+		elements := make([]Value, len(runes))
+		for i, ch := range runes {
 			elements[i] = StringValue(string(ch))
 		}
 
@@ -610,7 +649,7 @@ func splitBuiltin(args ...Value) Value {
 // substringBuiltin implements substring(str, start, end) - get substring
 func substringBuiltin(args ...Value) Value {
 	if len(args) != 3 {
-		fmt.Printf("substring: wrong number of arguments. got=%d, want=3\n", len(args))
+		printError("substring: wrong number of arguments. got=%d, want=3", len(args))
 		return NilValue()
 	}
 
@@ -619,17 +658,17 @@ func substringBuiltin(args ...Value) Value {
 	end := args[2]
 
 	if str.Type != StringType {
-		fmt.Printf("substring: first argument must be string\n")
+		printError("substring: first argument must be string")
 		return NilValue()
 	}
 
 	if start.Type != IntType {
-		fmt.Printf("substring: second argument must be int\n")
+		printError("substring: second argument must be int")
 		return NilValue()
 	}
 
 	if end.Type != IntType {
-		fmt.Printf("substring: third argument must be int\n")
+		printError("substring: third argument must be int")
 		return NilValue()
 	}
 
@@ -654,7 +693,7 @@ func substringBuiltin(args ...Value) Value {
 // intBuiltin implements int(x) - convert to int
 func intBuiltin(args ...Value) Value {
 	if len(args) != 1 {
-		fmt.Printf("int: wrong number of arguments. got=%d, want=1\n", len(args))
+		printError("int: wrong number of arguments. got=%d, want=1", len(args))
 		return NilValue()
 	}
 
@@ -688,7 +727,7 @@ func intBuiltin(args ...Value) Value {
 
 		for i := start; i < len(str); i++ {
 			if str[i] < '0' || str[i] > '9' {
-				fmt.Printf("int: invalid integer string '%s'\n", str)
+				printError("int: invalid integer string '%s'", str)
 				return NilValue()
 			}
 			result = result*10 + int64(str[i]-'0')
@@ -700,7 +739,7 @@ func intBuiltin(args ...Value) Value {
 
 		return IntValue(result)
 	default:
-		fmt.Printf("int: cannot convert type to int\n")
+		printError("int: cannot convert type to int")
 		return NilValue()
 	}
 }
@@ -708,7 +747,7 @@ func intBuiltin(args ...Value) Value {
 // floatBuiltin implements float(x) - convert to float
 func floatBuiltin(args ...Value) Value {
 	if len(args) != 1 {
-		fmt.Printf("float: wrong number of arguments. got=%d, want=1\n", len(args))
+		printError("float: wrong number of arguments. got=%d, want=1", len(args))
 		return NilValue()
 	}
 
@@ -745,7 +784,7 @@ func floatBuiltin(args ...Value) Value {
 		for i := start; i < len(str); i++ {
 			if str[i] == '.' {
 				if afterDecimal {
-					fmt.Printf("float: invalid float string '%s'\n", str)
+					printError("float: invalid float string '%s'", str)
 					return NilValue()
 				}
 				afterDecimal = true
@@ -753,7 +792,7 @@ func floatBuiltin(args ...Value) Value {
 			}
 
 			if str[i] < '0' || str[i] > '9' {
-				fmt.Printf("float: invalid float string '%s'\n", str)
+				printError("float: invalid float string '%s'", str)
 				return NilValue()
 			}
 
@@ -771,7 +810,7 @@ func floatBuiltin(args ...Value) Value {
 
 		return FloatValue(result)
 	default:
-		fmt.Printf("float: cannot convert type to float\n")
+		printError("float: cannot convert type to float")
 		return NilValue()
 	}
 }
@@ -779,12 +818,54 @@ func floatBuiltin(args ...Value) Value {
 // stringBuiltin implements string(x) - convert to string
 func stringBuiltin(args ...Value) Value {
 	if len(args) != 1 {
-		fmt.Printf("string: wrong number of arguments. got=%d, want=1\n", len(args))
+		printError("string: wrong number of arguments. got=%d, want=1", len(args))
 		return NilValue()
 	}
 
 	// Just use the existing String() method
 	return StringValue(args[0].String())
+}
+
+func typeofBuiltin(args ...Value) Value {
+	if len(args) != 1 {
+		printError("typeof: wrong number of arguments. got=%d, want=1", len(args))
+		return NilValue()
+	}
+	switch args[0].Type {
+	case IntType:
+		return StringValue("int")
+	case FloatType:
+		return StringValue("float")
+	case BoolType:
+		return StringValue("bool")
+	case StringType:
+		return StringValue("string")
+	case ArrayType:
+		return StringValue("array")
+	case MapType:
+		return StringValue("map")
+	case StructType:
+		return StringValue("struct")
+	case FunctionType, ClosureType:
+		return StringValue("function")
+	case BuiltinFunctionType:
+		return StringValue("builtin")
+	case NilType:
+		return StringValue("nil")
+	case FileType:
+		return StringValue("file")
+	default:
+		return StringValue("unknown")
+	}
+}
+
+func exitBuiltin(args ...Value) Value {
+	code := 0
+	if len(args) > 0 && args[0].Type == IntType {
+		code = int(args[0].AsInt())
+	}
+	os.Exit(code)
+	return NilValue()
 }
 
 // Cached builtin Values to avoid recreating them and growing the pool unnecessarily

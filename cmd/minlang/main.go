@@ -136,8 +136,5 @@ func main() {
 			os.Exit(1)
 		}
 
-		// Print result
-		result := machine.LastPoppedStackElem()
-		fmt.Println(result.String())
 	}
 }

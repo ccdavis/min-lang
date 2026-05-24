@@ -172,28 +172,64 @@ func (vm *RegisterVM) Run() error {
 
 		// Comparison operations (NO TYPE CHECKS)
 		case OpREqInt:
-			regs[a] = BoolValue(regs[b].AsInt() == regs[c].AsInt())
+			if regs[b].Type != regs[c].Type {
+				regs[a] = BoolValue(false)
+			} else {
+				regs[a] = BoolValue(regs[b].AsInt() == regs[c].AsInt())
+			}
 
 		case OpREqFloat:
-			regs[a] = BoolValue(regs[b].AsFloat() == regs[c].AsFloat())
+			if regs[b].Type != regs[c].Type {
+				regs[a] = BoolValue(false)
+			} else {
+				regs[a] = BoolValue(regs[b].AsFloat() == regs[c].AsFloat())
+			}
 
 		case OpREqBool:
-			regs[a] = BoolValue(regs[b].AsBool() == regs[c].AsBool())
+			if regs[b].Type != regs[c].Type {
+				regs[a] = BoolValue(false)
+			} else {
+				regs[a] = BoolValue(regs[b].AsBool() == regs[c].AsBool())
+			}
 
 		case OpREqString:
-			regs[a] = BoolValue(regs[b].AsString() == regs[c].AsString())
+			if regs[b].Type != regs[c].Type {
+				regs[a] = BoolValue(false)
+			} else if regs[b].Type == StringType {
+				regs[a] = BoolValue(regs[b].AsString() == regs[c].AsString())
+			} else {
+				regs[a] = BoolValue(regs[b].Data == regs[c].Data)
+			}
 
 		case OpRNeInt:
-			regs[a] = BoolValue(regs[b].AsInt() != regs[c].AsInt())
+			if regs[b].Type != regs[c].Type {
+				regs[a] = BoolValue(true)
+			} else {
+				regs[a] = BoolValue(regs[b].AsInt() != regs[c].AsInt())
+			}
 
 		case OpRNeFloat:
-			regs[a] = BoolValue(regs[b].AsFloat() != regs[c].AsFloat())
+			if regs[b].Type != regs[c].Type {
+				regs[a] = BoolValue(true)
+			} else {
+				regs[a] = BoolValue(regs[b].AsFloat() != regs[c].AsFloat())
+			}
 
 		case OpRNeBool:
-			regs[a] = BoolValue(regs[b].AsBool() != regs[c].AsBool())
+			if regs[b].Type != regs[c].Type {
+				regs[a] = BoolValue(true)
+			} else {
+				regs[a] = BoolValue(regs[b].AsBool() != regs[c].AsBool())
+			}
 
 		case OpRNeString:
-			regs[a] = BoolValue(regs[b].AsString() != regs[c].AsString())
+			if regs[b].Type != regs[c].Type {
+				regs[a] = BoolValue(true)
+			} else if regs[b].Type == StringType {
+				regs[a] = BoolValue(regs[b].AsString() != regs[c].AsString())
+			} else {
+				regs[a] = BoolValue(regs[b].Data != regs[c].Data)
+			}
 
 		case OpRLtInt:
 			regs[a] = BoolValue(regs[b].AsInt() < regs[c].AsInt())
@@ -331,6 +367,9 @@ func (vm *RegisterVM) Run() error {
 					return fmt.Errorf("string index out of bounds: %d", idx)
 				}
 				regs[a] = StringValue(string(str[idx]))
+
+			default:
+				return fmt.Errorf("index operator not supported for type %d", container.Type)
 			}
 
 		case OpRSetIdx:
@@ -339,6 +378,9 @@ func (vm *RegisterVM) Run() error {
 			index := regs[b]
 			value := regs[c]
 
+			if container.Type != ArrayType {
+				return fmt.Errorf("index assignment not supported for type %d", container.Type)
+			}
 			idx := int(index.AsInt())
 			arrayVal := container.AsArray()
 			if idx < 0 || idx >= len(arrayVal.Elements) {

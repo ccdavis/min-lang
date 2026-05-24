@@ -1,0 +1,27 @@
+// Console I/O Demo
+
+print("=== write (no newline) ===");
+write("Hello ");
+write("World");
+print("!");
+
+print("");
+print("=== eprint (stderr) ===");
+eprint("This goes to stderr");
+ewrite("stderr ");
+ewrite("no newline");
+eprint("");
+
+print("");
+print("=== typeof ===");
+print("typeof(42):", typeof(42));
+print("typeof(3.14):", typeof(3.14));
+print("typeof(true):", typeof(true));
+print("typeof(\"hi\"):", typeof("hello"));
+print("typeof(nil):", typeof(nil));
+print("typeof([1,2]):", typeof([1, 2]));
+
+print("");
+print("=== Done ===");
+// Note: readln() is interactive - try it with:
+//   echo "Alice" | minlang examples/io_interactive.min

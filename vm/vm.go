@@ -281,64 +281,78 @@ func (vm *VM) Run() error {
 			case OpEqInt:
 				right := vm.pop()
 				left := vm.pop()
-				err := vm.push(BoolValue(left.AsInt() == right.AsInt()))
-				if err != nil {
+				result := left.Type == right.Type && left.AsInt() == right.AsInt()
+				if err := vm.push(BoolValue(result)); err != nil {
 					return err
 				}
 
 			case OpEqFloat:
 				right := vm.pop()
 				left := vm.pop()
-				err := vm.push(BoolValue(left.AsFloat() == right.AsFloat()))
-				if err != nil {
+				result := left.Type == right.Type && left.AsFloat() == right.AsFloat()
+				if err := vm.push(BoolValue(result)); err != nil {
 					return err
 				}
 
 			case OpEqString:
 				right := vm.pop()
 				left := vm.pop()
-				err := vm.push(BoolValue(left.AsString() == right.AsString()))
-				if err != nil {
+				var result bool
+				if left.Type != right.Type {
+					result = false
+				} else if left.Type == StringType {
+					result = left.AsString() == right.AsString()
+				} else {
+					result = left.Data == right.Data
+				}
+				if err := vm.push(BoolValue(result)); err != nil {
 					return err
 				}
 
 			case OpEqBool:
 				right := vm.pop()
 				left := vm.pop()
-				err := vm.push(BoolValue(left.AsBool() == right.AsBool()))
-				if err != nil {
+				result := left.Type == right.Type && left.AsBool() == right.AsBool()
+				if err := vm.push(BoolValue(result)); err != nil {
 					return err
 				}
 
 			case OpNeInt:
 				right := vm.pop()
 				left := vm.pop()
-				err := vm.push(BoolValue(left.AsInt() != right.AsInt()))
-				if err != nil {
+				result := left.Type != right.Type || left.AsInt() != right.AsInt()
+				if err := vm.push(BoolValue(result)); err != nil {
 					return err
 				}
 
 			case OpNeFloat:
 				right := vm.pop()
 				left := vm.pop()
-				err := vm.push(BoolValue(left.AsFloat() != right.AsFloat()))
-				if err != nil {
+				result := left.Type != right.Type || left.AsFloat() != right.AsFloat()
+				if err := vm.push(BoolValue(result)); err != nil {
 					return err
 				}
 
 			case OpNeString:
 				right := vm.pop()
 				left := vm.pop()
-				err := vm.push(BoolValue(left.AsString() != right.AsString()))
-				if err != nil {
+				var result bool
+				if left.Type != right.Type {
+					result = true
+				} else if left.Type == StringType {
+					result = left.AsString() != right.AsString()
+				} else {
+					result = left.Data != right.Data
+				}
+				if err := vm.push(BoolValue(result)); err != nil {
 					return err
 				}
 
 			case OpNeBool:
 				right := vm.pop()
 				left := vm.pop()
-				err := vm.push(BoolValue(left.AsBool() != right.AsBool()))
-				if err != nil {
+				result := left.Type != right.Type || left.AsBool() != right.AsBool()
+				if err := vm.push(BoolValue(result)); err != nil {
 					return err
 				}
 

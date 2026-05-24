@@ -1,8 +1,10 @@
 package vm
 
 import (
+	"bufio"
 	"fmt"
 	"math"
+	"os"
 	"unsafe"
 )
 
@@ -27,6 +29,9 @@ var structPool []*StructValue
 // Builtin function pool - stores function pointers on heap to prevent dangling pointers
 // Note: BuiltinFunction is defined in builtins.go as func(args ...Value) Value
 var builtinFunctionPool []interface{}
+
+// File handle pool to keep file handles alive for GC
+var fileHandlePool []*FileHandle
 
 // trimPool keeps a pool at a reasonable size by keeping only recent entries
 func trimPool[T any](pool *[]T) {
@@ -53,6 +58,7 @@ const (
 	ClosureType
 	BuiltinFunctionType
 	NilType
+	FileType
 )
 
 // Value represents a runtime value in the VM
@@ -130,6 +136,8 @@ func (v Value) IsTruthy() bool {
 		return v.AsString() != ""
 	case NilType:
 		return false
+	case FileType:
+		return v.Data != 0 && v.AsFileHandle().File != nil
 	default:
 		return true
 	}
@@ -160,6 +168,8 @@ func (v Value) String() string {
 		return "<closure>"
 	case BuiltinFunctionType:
 		return "<builtin>"
+	case FileType:
+		return "<file>"
 	default:
 		return "<unknown>"
 	}
@@ -310,6 +320,29 @@ func NewClosureValue(fn *Function, free []Value) Value {
 
 func (v Value) AsClosure() *Closure {
 	return (*Closure)(unsafe.Pointer(uintptr(v.Data)))
+}
+
+// FileHandle represents an open file
+type FileHandle struct {
+	File     *os.File
+	Mode     string         // "r", "w", "a"
+	ElemType string         // "string", "byte", "int", "float"
+	Scanner  *bufio.Scanner // for text file line reading (nil for binary)
+	RecSize  int            // 0 for text, 1 for byte, 8 for int/float
+	AtEOF   bool
+}
+
+func NewFileHandleValue(fh *FileHandle) Value {
+	fileHandlePool = append(fileHandlePool, fh)
+	trimPool(&fileHandlePool)
+	return Value{
+		Type: FileType,
+		Data: uint64(uintptr(unsafe.Pointer(fh))),
+	}
+}
+
+func (v Value) AsFileHandle() *FileHandle {
+	return (*FileHandle)(unsafe.Pointer(uintptr(v.Data)))
 }
 
 // AsBuiltinFunction extracts a builtin function from a Value

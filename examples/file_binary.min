@@ -1,0 +1,72 @@
+// Binary File I/O Demo (Turbo Pascal "File of TYPE" style)
+
+print("=== File of int ===");
+var f = fopen("/tmp/minlang_ints.bin", "w", "int");
+for var i = 0; i < 10; i = i + 1 {
+    fwrite(f, i * i);
+}
+fclose(f);
+print("Wrote 10 int records (squares 0-9)");
+
+var f = fopen("/tmp/minlang_ints.bin", "r", "int");
+print("File size:", fsize(f), "records");
+print("Sequential read:");
+for !feof(f) {
+    var val = fread(f);
+    if val != nil {
+        write("  " + string(val));
+    }
+}
+print("");
+
+// Random access
+fseek(f, 7);
+print("Record 7 (seek):", fread(f));
+fseek(f, 0);
+print("Record 0 (seek):", fread(f));
+print("Current position:", ftell(f));
+fclose(f);
+
+print("");
+print("=== File of float ===");
+var f = fopen("/tmp/minlang_floats.bin", "w", "float");
+fwrite(f, 3.14159);
+fwrite(f, 2.71828);
+fwrite(f, 1.41421);
+fclose(f);
+
+var f = fopen("/tmp/minlang_floats.bin", "r", "float");
+print("Float records:", fsize(f));
+for !feof(f) {
+    var val = fread(f);
+    if val != nil {
+        print("  " + string(val));
+    }
+}
+fclose(f);
+
+print("");
+print("=== File of byte ===");
+var f = fopen("/tmp/minlang_bytes.bin", "w", "byte");
+// Write ASCII: "Hello"
+fwrite(f, 72);   // H
+fwrite(f, 101);  // e
+fwrite(f, 108);  // l
+fwrite(f, 108);  // l
+fwrite(f, 111);  // o
+fclose(f);
+
+var f = fopen("/tmp/minlang_bytes.bin", "r", "byte");
+print("Byte file size:", fsize(f), "bytes");
+var result = "";
+for !feof(f) {
+    var b = fread(f);
+    if b != nil {
+        result = result + char(b);
+    }
+}
+print("Read as string:", result);
+fclose(f);
+
+print("");
+print("=== Done ===");

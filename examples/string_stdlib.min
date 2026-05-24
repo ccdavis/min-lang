@@ -1,0 +1,81 @@
+// String Standard Library Demo
+
+print("=== trim ===");
+print("'" + trim("  hello  ") + "'");
+print("'" + trim("   spaced   ") + "'");
+
+print("");
+print("=== upper / lower ===");
+print(upper("hello world"));
+print(lower("HELLO WORLD"));
+print(upper("MinLang 2024!"));
+
+print("");
+print("=== contains ===");
+print(contains("hello world", "world"));
+print(contains("hello world", "xyz"));
+print(contains("", ""));
+
+print("");
+print("=== indexOf ===");
+print(indexOf("hello world", "world"));
+print(indexOf("hello world", "xyz"));
+print(indexOf("abcabc", "bc"));
+
+print("");
+print("=== replace ===");
+print(replace("hello world", "world", "MinLang"));
+print(replace("aaa", "a", "bb"));
+print(replace("no match", "xyz", "abc"));
+
+print("");
+print("=== startsWith / endsWith ===");
+print(startsWith("hello world", "hello"));
+print(startsWith("hello world", "world"));
+print(endsWith("hello world", "world"));
+print(endsWith("hello world", "hello"));
+
+print("");
+print("=== join ===");
+var parts = ["apple", "banana", "cherry"];
+print(join(parts, ", "));
+print(join(parts, " - "));
+print(join(["single"], ":"));
+
+print("");
+print("=== repeat ===");
+print(repeat("ab", 4));
+print(repeat("-", 20));
+print(repeat("x", 0));
+
+print("");
+print("=== char / ord ===");
+print(char(65));
+print(char(97));
+print(char(48));
+print(ord("A"));
+print(ord("a"));
+print(ord("0"));
+
+print("");
+print("=== Practical: CSV parsing ===");
+var csv = "name,age,city";
+var headers = split(csv, ",");
+var row = "Alice,30,Portland";
+var values = split(row, ",");
+for var i = 0; i < len(headers); i = i + 1 {
+    print(upper(headers[i]) + ": " + values[i]);
+}
+
+print("");
+print("=== Practical: String search ===");
+var text = "The quick brown fox jumps over the lazy dog";
+var searchWord = "fox";
+if contains(text, searchWord) {
+    print("Found '" + searchWord + "' at index " + string(indexOf(text, searchWord)));
+} else {
+    print("Not found");
+}
+
+print("");
+print("=== Done ===");

@@ -56,6 +56,39 @@ func NewSymbolTable() *SymbolTable {
 	st.DefineBuiltin(18, "int")
 	st.DefineBuiltin(19, "float")
 	st.DefineBuiltin(20, "string")
+	// String functions
+	st.DefineBuiltin(21, "trim")
+	st.DefineBuiltin(22, "upper")
+	st.DefineBuiltin(23, "lower")
+	st.DefineBuiltin(24, "contains")
+	st.DefineBuiltin(25, "indexOf")
+	st.DefineBuiltin(26, "replace")
+	st.DefineBuiltin(27, "startsWith")
+	st.DefineBuiltin(28, "endsWith")
+	st.DefineBuiltin(29, "join")
+	st.DefineBuiltin(30, "repeat")
+	st.DefineBuiltin(31, "char")
+	st.DefineBuiltin(32, "ord")
+	// Console I/O
+	st.DefineBuiltin(33, "write")
+	st.DefineBuiltin(34, "eprint")
+	st.DefineBuiltin(35, "ewrite")
+	st.DefineBuiltin(36, "readln")
+	// File I/O
+	st.DefineBuiltin(37, "fopen")
+	st.DefineBuiltin(38, "fclose")
+	st.DefineBuiltin(39, "fread")
+	st.DefineBuiltin(40, "fwrite")
+	st.DefineBuiltin(41, "fwriteln")
+	st.DefineBuiltin(42, "feof")
+	st.DefineBuiltin(43, "fseek")
+	st.DefineBuiltin(44, "ftell")
+	st.DefineBuiltin(45, "fsize")
+	st.DefineBuiltin(46, "readFile")
+	st.DefineBuiltin(47, "writeFile")
+	// Utility
+	st.DefineBuiltin(48, "typeof")
+	st.DefineBuiltin(49, "exit")
 
 	return st
 }

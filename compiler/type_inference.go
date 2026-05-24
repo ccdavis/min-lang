@@ -140,6 +140,17 @@ func (c *Compiler) inferExpressionType(node ast.Expression) vm.ValueType {
 				return vm.ArrayType
 			case "len":
 				return vm.IntType
+			case "trim", "upper", "lower", "replace", "join", "repeat", "char", "typeof", "substring",
+				"enumName":
+				return vm.StringType
+			case "contains", "startsWith", "endsWith", "feof":
+				return vm.BoolType
+			case "indexOf", "ord", "ftell", "fsize":
+				return vm.IntType
+			case "print", "write", "eprint", "ewrite",
+				"fclose", "fwrite", "fwriteln", "fseek", "writeFile",
+				"delete":
+				return vm.NilType
 			// User-defined functions - check function signature
 			default:
 				if funcType, ok := c.functionSigs[ident.Value]; ok {
