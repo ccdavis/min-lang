@@ -32,6 +32,89 @@ type LiveRange struct {
 	end   int // Last instruction where variable is used
 }
 
+// constOpMatch describes a const-aware register opcode that fits a particular
+// `expr op literal` pattern. constVal is the Value to add to the constant pool
+// and feed via the instruction's C field.
+type constOpMatch struct {
+	op       vm.RegisterOpCode
+	constVal vm.Value
+}
+
+// constOpForLiteralRight inspects an InfixExpression and returns the const-aware
+// opcode and constant Value if the right operand is an integer or float literal
+// AND the operator has a const-aware variant. Otherwise returns (_, false).
+func constOpForLiteralRight(node *ast.InfixExpression, rc *RegisterCompiler) (constOpMatch, bool) {
+	var rightIsInt, rightIsFloat bool
+	var intVal int64
+	var floatVal float64
+	if il, ok := node.Right.(*ast.IntegerLiteral); ok {
+		rightIsInt = true
+		intVal = il.Value
+	} else if fl, ok := node.Right.(*ast.FloatLiteral); ok {
+		rightIsFloat = true
+		floatVal = fl.Value
+	} else {
+		return constOpMatch{}, false
+	}
+
+	leftType := rc.inferExpressionType(node.Left)
+	useFloat := rightIsFloat || leftType == vm.FloatType
+
+	var op vm.RegisterOpCode
+	switch node.Operator {
+	case "+":
+		if useFloat {
+			op = vm.OpRAddConstFloat
+		} else {
+			op = vm.OpRAddConstInt
+		}
+	case "*":
+		if useFloat {
+			op = vm.OpRMulConstFloat
+		} else {
+			op = vm.OpRMulConstInt
+		}
+	case "<":
+		if useFloat {
+			op = vm.OpRLtConstFloat
+		} else {
+			op = vm.OpRLtConstInt
+		}
+	case ">":
+		if useFloat {
+			op = vm.OpRGtConstFloat
+		} else {
+			op = vm.OpRGtConstInt
+		}
+	case "<=":
+		if useFloat {
+			op = vm.OpRLeConstFloat
+		} else {
+			op = vm.OpRLeConstInt
+		}
+	case ">=":
+		if useFloat {
+			op = vm.OpRGeConstFloat
+		} else {
+			op = vm.OpRGeConstInt
+		}
+	default:
+		return constOpMatch{}, false
+	}
+
+	var v vm.Value
+	if useFloat {
+		if rightIsInt {
+			v = vm.FloatValue(float64(intVal))
+		} else {
+			v = vm.FloatValue(floatVal)
+		}
+	} else {
+		v = vm.IntValue(intVal)
+	}
+	return constOpMatch{op: op, constVal: v}, true
+}
+
 // NewRegisterCompiler creates a new register compiler
 func NewRegisterCompiler() *RegisterCompiler {
 	return &RegisterCompiler{
@@ -88,6 +171,34 @@ func (rc *RegisterCompiler) allocateRegister(name string) int {
 	return reg
 }
 
+// allocateConsecutiveBlock reserves n contiguous register slots starting at
+// nextReg. Always at the top: callees in the register VM occupy a contiguous
+// window starting at the caller's argBaseReg and extending for NumLocals slots,
+// so any in-use register below argBaseReg risks getting clobbered. We rely on
+// freeTempRegister's stack-discipline reclaim (see below) to keep MaxRegs
+// bounded across many calls.
+func (rc *RegisterCompiler) allocateConsecutiveBlock(n int) int {
+	if n <= 0 {
+		return rc.nextReg
+	}
+	base := rc.nextReg
+	rc.nextReg += n
+	if rc.nextReg > rc.MaxRegs {
+		rc.MaxRegs = rc.nextReg
+	}
+	// Remove any in-block slots that lingered in tempRegs (rare; defensive).
+	if len(rc.tempRegs) > 0 {
+		pruned := rc.tempRegs[:0]
+		for _, r := range rc.tempRegs {
+			if r < base || r >= base+n {
+				pruned = append(pruned, r)
+			}
+		}
+		rc.tempRegs = pruned
+	}
+	return base
+}
+
 // allocateTempRegister allocates a temporary register
 func (rc *RegisterCompiler) allocateTempRegister() int {
 	// Reuse freed temps if available
@@ -108,15 +219,41 @@ func (rc *RegisterCompiler) allocateTempRegister() int {
 	return reg
 }
 
-// freeTempRegister marks a temporary register as available
+// freeTempRegister returns a temporary register to the pool.
+// Permanent variable registers (parameters, locals declared with var) are
+// rejected — adding them lets the next temp allocation clobber the variable.
+// After enqueueing, we compact the top of the stack: any contiguous freed
+// slots at nextReg-1 collapse back into the unallocated zone. This keeps the
+// allocator at stack discipline so repeated call sites don't grow nextReg
+// past 256 (the 8-bit register-field limit).
 func (rc *RegisterCompiler) freeTempRegister(reg int) {
-	// Check if already in pool to prevent double-free
+	for _, permReg := range rc.registers {
+		if permReg == reg {
+			return
+		}
+	}
 	for _, r := range rc.tempRegs {
 		if r == reg {
-			return // Already freed, don't add duplicate
+			return
 		}
 	}
 	rc.tempRegs = append(rc.tempRegs, reg)
+	// Compact: if the just-freed range now reaches nextReg-1, shrink nextReg.
+	for rc.nextReg > 0 {
+		top := rc.nextReg - 1
+		found := -1
+		for i, r := range rc.tempRegs {
+			if r == top {
+				found = i
+				break
+			}
+		}
+		if found < 0 {
+			break
+		}
+		rc.tempRegs = append(rc.tempRegs[:found], rc.tempRegs[found+1:]...)
+		rc.nextReg--
+	}
 }
 
 // emitR emits a register instruction
@@ -169,6 +306,64 @@ func (rc *RegisterCompiler) CompileToRegister(node ast.Node) (int, error) {
 		// Free the result register if it's a temp
 		if resultReg >= 0 {
 			rc.freeTempRegister(resultReg)
+		}
+		return -1, nil
+
+	case *ast.TypeStatement:
+		// Type declarations are compile-time metadata only.
+		// Structs: register name+field-order; emit no bytecode.
+		// Enums: register variants and emit init code to bind each variant
+		// to a global/local (mirroring the stack compiler).
+		switch def := node.Definition.(type) {
+		case *ast.StructStatement:
+			def.Name = node.Name
+			structType := &StructType{
+				Name:       node.Name.Value,
+				Fields:     make(map[string]string),
+				FieldOrder: make([]string, 0, len(def.Fields)),
+			}
+			for _, field := range def.Fields {
+				structType.Fields[field.Name.Value] = field.Type.String()
+				structType.FieldOrder = append(structType.FieldOrder, field.Name.Value)
+			}
+			rc.structTypes[node.Name.Value] = structType
+			return -1, nil
+
+		case *ast.EnumStatement:
+			def.Name = node.Name
+			return rc.CompileToRegister(def)
+		}
+		return -1, nil
+
+	case *ast.EnumStatement:
+		// Register enum metadata; bind each variant to its integer value in
+		// the enclosing scope. Mirrors the stack compiler's behaviour but
+		// emits register opcodes.
+		enumType := &EnumType{
+			Name:         node.Name.Value,
+			Variants:     make(map[string]int),
+			VariantNames: make([]string, len(node.Variants)),
+		}
+		for i, variant := range node.Variants {
+			enumType.Variants[variant.Value] = i
+			enumType.VariantNames[i] = variant.Value
+
+			symbol := rc.symbolTable.DefineWithMutability(variant.Value, false)
+			constIdx := rc.addConstant(vm.IntValue(int64(i)))
+			if symbol.Scope == GlobalScope {
+				tempReg := rc.allocateTempRegister()
+				rc.emitRBx(vm.OpRLoadK, uint8(tempReg), uint16(constIdx))
+				rc.emitRBx(vm.OpRStoreGlobal, uint8(tempReg), uint16(symbol.Index))
+				rc.freeTempRegister(tempReg)
+			} else {
+				varReg := rc.allocateRegister(variant.Value)
+				rc.emitRBx(vm.OpRLoadK, uint8(varReg), uint16(constIdx))
+			}
+		}
+		rc.enumTypes[node.Name.Value] = enumType
+		vm.EnumRegistry[node.Name.Value] = make(map[int]string)
+		for value, name := range enumType.VariantNames {
+			vm.EnumRegistry[node.Name.Value][value] = name
 		}
 		return -1, nil
 
@@ -327,7 +522,12 @@ func (rc *RegisterCompiler) CompileToRegister(node ast.Node) (int, error) {
 				return -1, err
 			}
 
-			rc.emitR(vm.OpRSetIdx, uint8(containerReg), uint8(indexReg), uint8(valueReg))
+			// OpRSetIdx unconditionally casts to *ArrayValue; maps need OpRMapSet.
+			setOp := vm.OpRSetIdx
+			if rc.inferExpressionType(left.Left) == vm.MapType {
+				setOp = vm.OpRMapSet
+			}
+			rc.emitR(setOp, uint8(containerReg), uint8(indexReg), uint8(valueReg))
 
 			rc.freeTempRegister(containerReg)
 			rc.freeTempRegister(indexReg)
@@ -345,11 +545,12 @@ func (rc *RegisterCompiler) CompileToRegister(node ast.Node) (int, error) {
 				return -1, err
 			}
 
-			// Get field name constant
 			fieldIdx := rc.addConstant(vm.StringValue(left.Field.Value))
-
-			rc.emitRBx(vm.OpRSetField, uint8(objReg), uint16(fieldIdx))
-			rc.emitR(vm.OpRMove, uint8(objReg), uint8(valueReg), 0)
+			if fieldIdx >= 256 {
+				return -1, fmt.Errorf("too many constants: field name %q exceeds register-VM uint8 limit", left.Field.Value)
+			}
+			// OpRSetField: R(A).field(K(B)) = R(C)
+			rc.emitR(vm.OpRSetField, uint8(objReg), uint8(fieldIdx), uint8(valueReg))
 
 			rc.freeTempRegister(objReg)
 			rc.freeTempRegister(valueReg)
@@ -357,6 +558,26 @@ func (rc *RegisterCompiler) CompileToRegister(node ast.Node) (int, error) {
 		return -1, nil
 
 	case *ast.InfixExpression:
+		// Peephole: `expr OP literal` -> emit const-aware opcode that reads
+		// the constant inline instead of materializing it into a register first.
+		// The register instruction's C field is uint8 so this only fires when
+		// the constant index fits in 256.
+		if constOp, ok := constOpForLiteralRight(node, rc); ok {
+			constIdx := rc.addConstant(constOp.constVal)
+			// Register instruction's C field is uint8, so the const op variant
+			// only applies when the (deduped) constant index fits in 256.
+			if constIdx < 256 {
+				leftReg, err := rc.CompileToRegister(node.Left)
+				if err != nil {
+					return -1, err
+				}
+				resultReg := rc.allocateTempRegister()
+				rc.emitR(constOp.op, uint8(resultReg), uint8(leftReg), uint8(constIdx))
+				rc.freeTempRegister(leftReg)
+				return resultReg, nil
+			}
+		}
+
 		// Compile left and right operands
 		leftReg, err := rc.CompileToRegister(node.Left)
 		if err != nil {
@@ -376,7 +597,9 @@ func (rc *RegisterCompiler) CompileToRegister(node ast.Node) (int, error) {
 
 		switch node.Operator {
 		case "+":
-			if leftType == vm.IntType && rightType == vm.IntType {
+			if leftType == vm.StringType || rightType == vm.StringType {
+				rc.emitR(vm.OpRConcat, uint8(resultReg), uint8(leftReg), uint8(rightReg))
+			} else if leftType == vm.IntType && rightType == vm.IntType {
 				rc.emitR(vm.OpRAddInt, uint8(resultReg), uint8(leftReg), uint8(rightReg))
 			} else {
 				rc.emitR(vm.OpRAddFloat, uint8(resultReg), uint8(leftReg), uint8(rightReg))
@@ -470,28 +693,10 @@ func (rc *RegisterCompiler) CompileToRegister(node ast.Node) (int, error) {
 			return -1, fmt.Errorf("unknown operator: %s", node.Operator)
 		}
 
-		// Free input registers only if they're temps (not permanent variable registers)
-		isLeftPermanent := false
-		for _, permReg := range rc.registers {
-			if permReg == leftReg {
-				isLeftPermanent = true
-				break
-			}
-		}
-		if !isLeftPermanent {
-			rc.freeTempRegister(leftReg)
-		}
-
-		isRightPermanent := false
-		for _, permReg := range rc.registers {
-			if permReg == rightReg {
-				isRightPermanent = true
-				break
-			}
-		}
-		if !isRightPermanent {
-			rc.freeTempRegister(rightReg)
-		}
+		// freeTempRegister itself rejects permanent variable registers, so the
+		// callers no longer need the linear scan they used to do here.
+		rc.freeTempRegister(leftReg)
+		rc.freeTempRegister(rightReg)
 
 		return resultReg, nil
 
@@ -515,17 +720,7 @@ func (rc *RegisterCompiler) CompileToRegister(node ast.Node) (int, error) {
 			}
 		}
 
-		// Only free if it's not a permanent variable register
-		isOperandPermanent := false
-		for _, permReg := range rc.registers {
-			if permReg == operandReg {
-				isOperandPermanent = true
-				break
-			}
-		}
-		if !isOperandPermanent {
-			rc.freeTempRegister(operandReg)
-		}
+		rc.freeTempRegister(operandReg)
 		return resultReg, nil
 
 	case *ast.IfStatement:
@@ -535,8 +730,14 @@ func (rc *RegisterCompiler) CompileToRegister(node ast.Node) (int, error) {
 			return -1, err
 		}
 
+		// Pick fast-path jump if the condition's static type is bool.
+		jumpOp := vm.OpRJumpF
+		if rc.inferExpressionType(node.Condition) == vm.BoolType {
+			jumpOp = vm.OpRJumpFBool
+		}
+
 		// Jump if false (placeholder)
-		jumpIfFalse := rc.emitRBx(vm.OpRJumpF, uint8(condReg), 9999)
+		jumpIfFalse := rc.emitRBx(jumpOp, uint8(condReg), 9999)
 		rc.freeTempRegister(condReg)
 
 		// Compile consequence
@@ -551,7 +752,7 @@ func (rc *RegisterCompiler) CompileToRegister(node ast.Node) (int, error) {
 		// Patch first jump
 		afterConsequence := len(rc.instructions)
 		rc.instructions[jumpIfFalse] = vm.EncodeRegisterInstructionBx(
-			vm.OpRJumpF, uint8(condReg), uint16(afterConsequence))
+			jumpOp, uint8(condReg), uint16(afterConsequence))
 
 		// Compile alternative if present
 		if node.Alternative != nil {
@@ -566,6 +767,77 @@ func (rc *RegisterCompiler) CompileToRegister(node ast.Node) (int, error) {
 		rc.instructions[jumpOverAlt] = vm.EncodeRegisterInstructionBx(
 			vm.OpRJump, 0, uint16(afterAlternative))
 
+		return -1, nil
+
+	case *ast.SwitchStatement:
+		// Switch is compiled as a chain of test-and-skip: for each case, eq-compare
+		// switch value with case value; if not equal, jump past the body; if equal,
+		// run the body then jump to the end.
+		switchReg, err := rc.CompileToRegister(node.Value)
+		if err != nil {
+			return -1, err
+		}
+
+		// Pick the type-specialized eq opcode for the switch value's type.
+		var eqOp vm.RegisterOpCode
+		switch rc.inferExpressionType(node.Value) {
+		case vm.FloatType:
+			eqOp = vm.OpREqFloat
+		case vm.StringType:
+			eqOp = vm.OpREqString
+		case vm.BoolType:
+			eqOp = vm.OpREqBool
+		default:
+			// IntType plus anything else (enums resolve to int).
+			eqOp = vm.OpREqInt
+		}
+
+		caseEndJumps := []int{}
+
+		for _, caseClause := range node.Cases {
+			caseValReg, err := rc.CompileToRegister(caseClause.Value)
+			if err != nil {
+				return -1, err
+			}
+			eqReg := rc.allocateTempRegister()
+			rc.emitR(eqOp, uint8(eqReg), uint8(switchReg), uint8(caseValReg))
+			rc.freeTempRegister(caseValReg)
+
+			// Skip the body if the comparison was false.
+			skipJump := rc.emitRBx(vm.OpRJumpFBool, uint8(eqReg), 9999)
+			rc.freeTempRegister(eqReg)
+
+			if _, err := rc.CompileToRegister(caseClause.Body); err != nil {
+				return -1, err
+			}
+
+			// After the body, jump over the remaining cases / default.
+			caseEndJumps = append(caseEndJumps, rc.emitRBx(vm.OpRJump, 0, 9999))
+
+			// Patch the skip-target to the instruction right after the case-end jump.
+			afterCase := len(rc.instructions)
+			rc.instructions[skipJump] = vm.EncodeRegisterInstructionBx(
+				vm.OpRJumpFBool, uint8(eqReg), uint16(afterCase))
+		}
+
+		if node.Default == nil {
+			// Reuse the exhaustiveness check from the stack compiler (embedded).
+			if err := rc.checkSwitchExhaustiveness(node); err != nil {
+				return -1, err
+			}
+		} else {
+			if _, err := rc.CompileToRegister(node.Default); err != nil {
+				return -1, err
+			}
+		}
+
+		endPos := len(rc.instructions)
+		for _, jp := range caseEndJumps {
+			rc.instructions[jp] = vm.EncodeRegisterInstructionBx(
+				vm.OpRJump, 0, uint16(endPos))
+		}
+
+		rc.freeTempRegister(switchReg)
 		return -1, nil
 
 	case *ast.ForStatement:
@@ -590,8 +862,14 @@ func (rc *RegisterCompiler) CompileToRegister(node ast.Node) (int, error) {
 			return -1, err
 		}
 
+		// Pick fast-path jump if the condition's static type is bool.
+		jumpOp := vm.OpRJumpF
+		if rc.inferExpressionType(node.Condition) == vm.BoolType {
+			jumpOp = vm.OpRJumpFBool
+		}
+
 		// Jump if false (placeholder)
-		jumpToEnd := rc.emitRBx(vm.OpRJumpF, uint8(condReg), 9999)
+		jumpToEnd := rc.emitRBx(jumpOp, uint8(condReg), 9999)
 		rc.freeTempRegister(condReg)
 
 		// Compile body
@@ -616,7 +894,7 @@ func (rc *RegisterCompiler) CompileToRegister(node ast.Node) (int, error) {
 
 		// Patch jump to end
 		loopEnd := len(rc.instructions)
-		rc.instructions[jumpToEnd] = vm.EncodeRegisterInstructionBx(vm.OpRJumpF, uint8(condReg), uint16(loopEnd))
+		rc.instructions[jumpToEnd] = vm.EncodeRegisterInstructionBx(jumpOp, uint8(condReg), uint16(loopEnd))
 
 		// Patch all break jumps to jump to loopEnd
 		loop := rc.currentRegisterLoop()
@@ -688,57 +966,45 @@ func (rc *RegisterCompiler) CompileToRegister(node ast.Node) (int, error) {
 		}
 
 		if isBuiltin {
-			// Allocate consecutive registers for arguments
 			numArgs := len(node.Arguments)
 
-			// IMPORTANT: Clear temp pool to ensure we get consecutive registers
-			// Save and restore it after allocation
-			savedTempRegs := rc.tempRegs
-			rc.tempRegs = []int{}
-
-			// Reserve consecutive registers for arguments (will be consecutive now)
+			// New OpRBuiltin encoding: A=resultReg, B=builtinIndex, C=numArgs.
+			// Args must sit at R(resultReg+1) ... R(resultReg+numArgs). We
+			// reserve a contiguous block (resultReg + numArgs args) — recycling
+			// freed slots when possible so register pressure stays bounded.
+			baseReg := rc.allocateConsecutiveBlock(1 + numArgs)
+			resultReg := baseReg
 			argRegs := make([]int, numArgs)
-			argBaseReg := rc.nextReg // Save base before allocation
 			for i := 0; i < numArgs; i++ {
-				argRegs[i] = rc.allocateTempRegister()
+				argRegs[i] = baseReg + 1 + i
 			}
 
-			// Restore temp pool
-			rc.tempRegs = savedTempRegs
-
-			// Compile each argument and move to its designated register
+			// Compile each argument into its slot.
 			for i, arg := range node.Arguments {
 				argReg, err := rc.CompileToRegister(arg)
 				if err != nil {
 					return -1, err
 				}
-				// Move to designated consecutive register if different
 				if argReg != argRegs[i] {
 					rc.emitR(vm.OpRMove, uint8(argRegs[i]), uint8(argReg), 0)
-					// Only free if it's not a permanent variable register
-					isPermanent := false
-					for _, permReg := range rc.registers {
-						if permReg == argReg {
-							isPermanent = true
-							break
-						}
-					}
-					if !isPermanent {
-						rc.freeTempRegister(argReg)
-					}
+					rc.freeTempRegister(argReg)
 				}
 			}
 
-			// Allocate result register
-			resultReg := rc.allocateTempRegister()
+			if builtinIndex > 255 {
+				return -1, fmt.Errorf("builtin index %d does not fit in uint8", builtinIndex)
+			}
+			if numArgs > 255 {
+				return -1, fmt.Errorf("builtin call with %d args exceeds uint8 limit", numArgs)
+			}
+			rc.emitR(vm.OpRBuiltin, uint8(resultReg), uint8(builtinIndex), uint8(numArgs))
 
-			// Emit builtin call instruction
-			// B field: low 4 bits = builtinIndex, high 4 bits = numArgs
-			// C field: argBaseReg
-			rc.emitR(vm.OpRBuiltin, uint8(resultReg), uint8(builtinIndex)|(uint8(numArgs)<<4), uint8(argBaseReg))
-
-			// Don't free argument registers - they're temps that will be reused anyway
-			// Freeing them seems to cause issues with register allocation
+			// Return arg slots to the temp pool. Otherwise nextReg grows by
+			// numArgs on every builtin call and pushes total register use past
+			// the 8-bit instruction-field limit (256), silently wrapping.
+			for _, ar := range argRegs {
+				rc.freeTempRegister(ar)
+			}
 
 			return resultReg, nil
 		}
@@ -750,22 +1016,15 @@ func (rc *RegisterCompiler) CompileToRegister(node ast.Node) (int, error) {
 			return -1, err
 		}
 
-		// Allocate consecutive registers for arguments (same as builtins)
+		// OpRCall layout: A=resultReg, B=fnReg, C=argBaseReg (args at C..C+numArgs-1).
+		// Allocate a contiguous block of numArgs slots for the args; recycle
+		// freed slots so we don't grow nextReg unbounded across many calls.
 		numArgs := len(node.Arguments)
-
-		// IMPORTANT: Clear temp pool to ensure we get consecutive registers
-		savedTempRegs := rc.tempRegs
-		rc.tempRegs = []int{}
-
-		// Reserve consecutive registers for arguments
+		argBaseReg := rc.allocateConsecutiveBlock(numArgs)
 		argRegs := make([]int, numArgs)
-		argBaseReg := rc.nextReg // Save base before allocation
 		for i := 0; i < numArgs; i++ {
-			argRegs[i] = rc.allocateTempRegister()
+			argRegs[i] = argBaseReg + i
 		}
-
-		// Restore temp pool
-		rc.tempRegs = savedTempRegs
 
 		// Compile each argument and move to its designated register
 		for i, arg := range node.Arguments {
@@ -773,20 +1032,9 @@ func (rc *RegisterCompiler) CompileToRegister(node ast.Node) (int, error) {
 			if err != nil {
 				return -1, err
 			}
-			// Move to designated consecutive register if different
 			if argReg != argRegs[i] {
 				rc.emitR(vm.OpRMove, uint8(argRegs[i]), uint8(argReg), 0)
-				// Only free if it's not a permanent variable register
-				isPermanent := false
-				for _, permReg := range rc.registers {
-					if permReg == argReg {
-						isPermanent = true
-						break
-					}
-				}
-				if !isPermanent {
-					rc.freeTempRegister(argReg)
-				}
+				rc.freeTempRegister(argReg)
 			}
 		}
 
@@ -797,8 +1045,11 @@ func (rc *RegisterCompiler) CompileToRegister(node ast.Node) (int, error) {
 		// OpRCall: R(A) = call R(B)(args starting at R(C))
 		rc.emitR(vm.OpRCall, uint8(resultReg), uint8(fnReg), uint8(argBaseReg))
 
-		// Free function register
+		// Free function register and arg slots — see builtin path for why.
 		rc.freeTempRegister(fnReg)
+		for _, ar := range argRegs {
+			rc.freeTempRegister(ar)
+		}
 
 		return resultReg, nil
 
@@ -839,8 +1090,13 @@ func (rc *RegisterCompiler) CompileToRegister(node ast.Node) (int, error) {
 			return -1, err
 		}
 
+		// OpRGetIdx handles array and string; maps need OpRMapGet.
+		getOp := vm.OpRGetIdx
+		if rc.inferExpressionType(node.Left) == vm.MapType {
+			getOp = vm.OpRMapGet
+		}
 		resultReg := rc.allocateTempRegister()
-		rc.emitR(vm.OpRGetIdx, uint8(resultReg), uint8(containerReg), uint8(indexReg))
+		rc.emitR(getOp, uint8(resultReg), uint8(containerReg), uint8(indexReg))
 
 		rc.freeTempRegister(containerReg)
 		rc.freeTempRegister(indexReg)
@@ -852,7 +1108,8 @@ func (rc *RegisterCompiler) CompileToRegister(node ast.Node) (int, error) {
 		mapReg := rc.allocateTempRegister()
 		rc.emitR(vm.OpRNewMap, uint8(mapReg), 0, 0)
 
-		// Compile and store key-value pairs
+		// Compile and store key-value pairs. Use OpRMapSet (not OpRSetIdx,
+		// which assumes an *ArrayValue and would segfault on a map pointer).
 		for key, value := range node.Pairs {
 			keyReg, err := rc.CompileToRegister(key)
 			if err != nil {
@@ -864,7 +1121,7 @@ func (rc *RegisterCompiler) CompileToRegister(node ast.Node) (int, error) {
 				return -1, err
 			}
 
-			rc.emitR(vm.OpRSetIdx, uint8(mapReg), uint8(keyReg), uint8(valueReg))
+			rc.emitR(vm.OpRMapSet, uint8(mapReg), uint8(keyReg), uint8(valueReg))
 
 			rc.freeTempRegister(keyReg)
 			rc.freeTempRegister(valueReg)
@@ -873,25 +1130,22 @@ func (rc *RegisterCompiler) CompileToRegister(node ast.Node) (int, error) {
 		return mapReg, nil
 
 	case *ast.StructLiteral:
-		// Create struct instance
+		// Create struct instance and populate each field by name.
 		structReg := rc.allocateTempRegister()
-
-		// Get struct type name constant
 		typeIdx := rc.addConstant(vm.StringValue(node.Name.Value))
 		rc.emitRBx(vm.OpRNewStruct, uint8(structReg), uint16(typeIdx))
 
-		// Set field values
 		for fieldName, fieldValue := range node.Fields {
 			valueReg, err := rc.CompileToRegister(fieldValue)
 			if err != nil {
 				return -1, err
 			}
-
-			// Get field name constant
 			fieldIdx := rc.addConstant(vm.StringValue(fieldName))
-			rc.emitRBx(vm.OpRSetField, uint8(structReg), uint16(fieldIdx))
-			rc.emitR(vm.OpRMove, uint8(structReg), uint8(valueReg), 0)
-
+			if fieldIdx >= 256 {
+				return -1, fmt.Errorf("too many constants: field name %q exceeds register-VM uint8 limit", fieldName)
+			}
+			// OpRSetField: R(A).field(K(B)) = R(C)
+			rc.emitR(vm.OpRSetField, uint8(structReg), uint8(fieldIdx), uint8(valueReg))
 			rc.freeTempRegister(valueReg)
 		}
 
@@ -904,11 +1158,14 @@ func (rc *RegisterCompiler) CompileToRegister(node ast.Node) (int, error) {
 			return -1, err
 		}
 
-		// Get field name constant
 		fieldIdx := rc.addConstant(vm.StringValue(node.Field.Value))
+		if fieldIdx >= 256 {
+			return -1, fmt.Errorf("too many constants: field name %q exceeds register-VM uint8 limit", node.Field.Value)
+		}
 
 		resultReg := rc.allocateTempRegister()
-		rc.emitRBx(vm.OpRGetField, uint8(resultReg), uint16(fieldIdx))
+		// OpRGetField: R(A) = R(B).field(K(C))
+		rc.emitR(vm.OpRGetField, uint8(resultReg), uint8(objReg), uint8(fieldIdx))
 
 		rc.freeTempRegister(objReg)
 

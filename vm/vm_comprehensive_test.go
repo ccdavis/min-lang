@@ -322,32 +322,3 @@ func TestPreAllocatedErrors(t *testing.T) {
 	}
 }
 
-// TestDirectLocalOperations tests OpAddLocal, OpSubLocal, etc.
-func TestDirectLocalOperations(t *testing.T) {
-	tests := []struct {
-		name string
-		op   OpCode
-		a    int64
-		b    int64
-		want int64
-	}{
-		{"AddLocal", OpAddLocal, 10, 5, 15},
-		{"SubLocal", OpSubLocal, 10, 5, 5},
-		{"MulLocal", OpMulLocal, 10, 5, 50},
-		{"DivLocal", OpDivLocal, 10, 5, 2},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create a simple program that uses direct local operations
-			// This is tested more thoroughly in integration tests
-			// Here we just verify the opcodes exist
-			switch tt.op {
-			case OpAddLocal, OpSubLocal, OpMulLocal, OpDivLocal:
-				// Opcodes exist
-			default:
-				t.Errorf("Opcode %d not recognized", tt.op)
-			}
-		})
-	}
-}

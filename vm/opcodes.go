@@ -30,12 +30,6 @@ const (
 	OpDivFloat  // float / float → float (no type checking)
 	OpModInt    // int % int → int (no type checking)
 
-	// Direct local operations (no push/pop overhead)
-	OpAddLocal // Add TOS with local variable, push result
-	OpSubLocal // Subtract local from TOS, push result
-	OpMulLocal // Multiply TOS with local variable, push result
-	OpDivLocal // Divide TOS by local variable, push result
-
 	// Comparison operations (generic - with runtime type checking)
 	OpEq // Equal
 	OpNe // Not equal
@@ -75,9 +69,10 @@ const (
 	OpLoadFree    // Load free variable (closure) onto stack
 
 	// Control flow
-	OpJump      // Unconditional jump
-	OpJumpIfFalse // Jump if top of stack is false
-	OpJumpIfTrue  // Jump if top of stack is true
+	OpJump          // Unconditional jump
+	OpJumpIfFalse   // Jump if top of stack is false (truthy check via IsTruthy)
+	OpJumpIfTrue    // Jump if top of stack is true (truthy check via IsTruthy)
+	OpJumpIfFalseBool // Jump if TOS bool is false (skips IsTruthy type switch)
 
 	// Function operations
 	OpCall         // Call function
@@ -189,14 +184,6 @@ func (op OpCode) String() string {
 		return "DIV_FLOAT"
 	case OpModInt:
 		return "MOD_INT"
-	case OpAddLocal:
-		return "ADD_LOCAL"
-	case OpSubLocal:
-		return "SUB_LOCAL"
-	case OpMulLocal:
-		return "MUL_LOCAL"
-	case OpDivLocal:
-		return "DIV_LOCAL"
 	case OpEq:
 		return "EQ"
 	case OpNe:
@@ -263,6 +250,8 @@ func (op OpCode) String() string {
 		return "JUMP_IF_FALSE"
 	case OpJumpIfTrue:
 		return "JUMP_IF_TRUE"
+	case OpJumpIfFalseBool:
+		return "JUMP_IF_FALSE_BOOL"
 	case OpCall:
 		return "CALL"
 	case OpReturn:

@@ -35,9 +35,10 @@ type RegisterVM struct {
 	currentFrame *RegisterFrame
 }
 
-// NewRegisterVM creates a new register-based VM
+// NewRegisterVM creates a new register-based VM.
+// All frames share vm.registers as a single backing array; each frame's
+// .registers field is a slice view starting at its baseReg.
 func NewRegisterVM(bytecode *RegisterBytecode) *RegisterVM {
-	// Determine register count from main function's NumLocals
 	numRegs := bytecode.MainFunction.NumLocals
 	if numRegs < InitialRegs {
 		numRegs = InitialRegs
@@ -51,13 +52,12 @@ func NewRegisterVM(bytecode *RegisterBytecode) *RegisterVM {
 		frameIndex: 0,
 	}
 
-	// Create main frame
 	mainFrame := &RegisterFrame{
 		function:     bytecode.MainFunction,
 		instructions: bytecode.Instructions,
 		pc:           0,
 		baseReg:      0,
-		registers:    vm.registers, // Main frame uses full register file
+		registers:    vm.registers,
 	}
 
 	vm.frames[0] = mainFrame
@@ -246,6 +246,13 @@ func (vm *RegisterVM) Run() error {
 				pc = int(bx)
 			}
 
+		case OpRJumpFBool:
+			// Fast path: condition is known-bool, skip the type switch in IsTruthy.
+			if regs[a].Data == 0 {
+				bx := uint16(instruction & 0xFFFF)
+				pc = int(bx)
+			}
+
 		case OpRReturn:
 			// Save PC before calling returnFromFunction
 			frame.pc = pc
@@ -286,12 +293,15 @@ func (vm *RegisterVM) Run() error {
 			regs = frame.registers
 
 		case OpRBuiltin:
-			// R(A) = builtin[B](R(C)...R(C+n))
-			// B field contains: low 4 bits = builtinIndex, high 4 bits = numArgs
-			builtinIndex := int(b & 0x0F)
-			numArgs := int(b >> 4)
-			// Builtin calls: args in R(C)...R(C+numArgs), result in R(A)
-			if err := vm.callBuiltin(builtinIndex, int(c), int(a), numArgs); err != nil {
+			// New encoding: A=resultReg, B=builtinIndex (full uint8), C=numArgs.
+			// Args live at R(A+1) ... R(A+numArgs), immediately after the result
+			// slot. The old layout packed builtinIndex into 4 bits and silently
+			// wrapped indices 16-20 (split/substring/int/float/string) into
+			// print/len/delete/append/keys.
+			builtinIndex := int(b)
+			numArgs := int(c)
+			argBaseReg := int(a) + 1
+			if err := vm.callBuiltin(builtinIndex, argBaseReg, int(a), numArgs); err != nil {
 				return err
 			}
 
@@ -357,26 +367,31 @@ func (vm *RegisterVM) Run() error {
 			value := regs[c]
 			mapVal.Pairs[key] = value
 
-		// Struct operations
+		// Struct operations.
+		// Name-based access via the constant pool. Field-name constant index
+		// must fit in a single byte; the compiler enforces this and falls back
+		// to an error if exceeded.
 		case OpRNewStruct:
-			// TODO: Implement struct creation
-			regs[a] = NilValue()
+			// R(A) = new struct with type name K(Bx)
+			bx := uint16(instruction & 0xFFFF)
+			typeName := constants[bx].AsString()
+			regs[a] = NewStructValue(typeName, make(map[string]Value, 4))
 
 		case OpRGetField:
-			// R(A) = R(B).field(C) - C is field offset
+			// R(A) = R(B).field(K(C)) — C is constant index for field name
 			structVal := regs[b].AsStruct()
-			if int(c) >= len(structVal.FieldsArray) {
-				return fmt.Errorf("field offset out of bounds: %d", c)
+			fieldName := constants[c].AsString()
+			val, ok := structVal.Fields[fieldName]
+			if !ok {
+				return fmt.Errorf("field %s not found in struct %s", fieldName, structVal.TypeName)
 			}
-			regs[a] = structVal.FieldsArray[c]
+			regs[a] = val
 
 		case OpRSetField:
-			// R(A).field(B) = R(C) - B is field offset
+			// R(A).field(K(B)) = R(C) — B is constant index for field name
 			structVal := regs[a].AsStruct()
-			if int(b) >= len(structVal.FieldsArray) {
-				return fmt.Errorf("field offset out of bounds: %d", b)
-			}
-			structVal.FieldsArray[b] = regs[c]
+			fieldName := constants[b].AsString()
+			structVal.Fields[fieldName] = regs[c]
 
 		// Global operations
 		case OpRLoadGlobal:
@@ -387,9 +402,11 @@ func (vm *RegisterVM) Run() error {
 			bx := uint16(instruction & 0xFFFF)
 			globals[bx] = regs[a]
 
-		// String operations
+		// String operations.
+		// Use .String() (not .AsString()) so mixed types like `"x=" + 3` work:
+		// the stack VM's OpAddString does the same.
 		case OpRConcat:
-			regs[a] = StringValue(regs[b].AsString() + regs[c].AsString())
+			regs[a] = StringValue(regs[b].String() + regs[c].String())
 
 		// Optimized operations with immediate constants (use c as const index)
 		case OpRAddConstInt:
@@ -403,6 +420,30 @@ func (vm *RegisterVM) Run() error {
 
 		case OpRMulConstFloat:
 			regs[a] = FloatValue(regs[b].AsFloat() * constants[c].AsFloat())
+
+		case OpRLtConstInt:
+			regs[a] = BoolValue(regs[b].AsInt() < constants[c].AsInt())
+
+		case OpRLtConstFloat:
+			regs[a] = BoolValue(regs[b].AsFloat() < constants[c].AsFloat())
+
+		case OpRGtConstInt:
+			regs[a] = BoolValue(regs[b].AsInt() > constants[c].AsInt())
+
+		case OpRGtConstFloat:
+			regs[a] = BoolValue(regs[b].AsFloat() > constants[c].AsFloat())
+
+		case OpRLeConstInt:
+			regs[a] = BoolValue(regs[b].AsInt() <= constants[c].AsInt())
+
+		case OpRLeConstFloat:
+			regs[a] = BoolValue(regs[b].AsFloat() <= constants[c].AsFloat())
+
+		case OpRGeConstInt:
+			regs[a] = BoolValue(regs[b].AsInt() >= constants[c].AsInt())
+
+		case OpRGeConstFloat:
+			regs[a] = BoolValue(regs[b].AsFloat() >= constants[c].AsFloat())
 
 		// Special optimizations
 		case OpRSquareInt:
@@ -425,11 +466,36 @@ func (vm *RegisterVM) Run() error {
 	}
 }
 
-// callFunction handles function calls in the register VM
+// growRegisters ensures vm.registers has at least `top` slots.
+// On reallocation, slice views held by existing frames are refreshed so callers
+// can continue to use frame.registers without re-indexing through baseReg.
+func (vm *RegisterVM) growRegisters(top int) {
+	if top <= len(vm.registers) {
+		return
+	}
+	n := len(vm.registers) * 2
+	if n < top {
+		n = top
+	}
+	newRegs := make([]Value, n)
+	copy(newRegs, vm.registers)
+	vm.registers = newRegs
+	// Refresh existing frame views to point into the new backing array.
+	for i := 0; i < vm.frameIndex; i++ {
+		f := vm.frames[i]
+		if f != nil {
+			f.registers = vm.registers[f.baseReg:]
+		}
+	}
+}
+
+// callFunction handles function calls in the register VM.
+// Frames share a single backing register file (Lua-style register window).
+// Args already sit at the caller's argReg..argReg+NumParams-1 slots, which
+// become the callee's R0..R(NumParams-1) — no copy required.
 func (vm *RegisterVM) callFunction(fnReg, argReg, resultReg int) error {
 	function := vm.currentFrame.registers[fnReg]
 
-	// Only handle Function and Closure types
 	var fn *Function
 	switch function.Type {
 	case FunctionType:
@@ -440,49 +506,30 @@ func (vm *RegisterVM) callFunction(fnReg, argReg, resultReg int) error {
 		return ErrCallingNonFunction
 	}
 
-	// Verify function has register instructions
 	if len(fn.RegisterInstructions) == 0 {
 		return fmt.Errorf("function %s has no register bytecode", fn.Name)
 	}
 
-	// Allocate new frame
 	if vm.frameIndex >= MaxFrames {
 		return fmt.Errorf("call stack overflow")
 	}
+
+	// New base lives at caller's argReg slot in the shared register array.
+	newBase := vm.currentFrame.baseReg + argReg
+	// Ensure backing array can fit the callee's register window.
+	vm.growRegisters(newBase + fn.NumLocals)
 
 	newFrame := vm.frames[vm.frameIndex]
 	if newFrame == nil {
 		newFrame = &RegisterFrame{}
 		vm.frames[vm.frameIndex] = newFrame
 	}
-
-	// Calculate register count needed (locals + extra for temps)
-	numRegs := fn.NumLocals
-	if numRegs < fn.NumParams + 16 {
-		numRegs = fn.NumParams + 16 // Ensure enough for params + temps
-	}
-
-	// Arguments are already in registers argReg..argReg+NumParams
-	// We'll use those registers as the base for the new frame
-
-	// Set up new frame
 	newFrame.function = fn
 	newFrame.instructions = fn.RegisterInstructions
 	newFrame.pc = 0
-	newFrame.baseReg = argReg
-	newFrame.resultReg = resultReg // Store where to put return value
-
-	// Create register window for new frame
-	// Arguments are in argReg..argReg+NumParams-1
-	// Function expects them in registers 0..NumParams-1
-	newFrame.registers = make([]Value, numRegs)
-
-	// Copy arguments to function's register 0, 1, 2, ... (parameter positions)
-	for i := 0; i < fn.NumParams; i++ {
-		if argReg+i < len(vm.currentFrame.registers) {
-			newFrame.registers[i] = vm.currentFrame.registers[argReg+i]
-		}
-	}
+	newFrame.baseReg = newBase
+	newFrame.resultReg = resultReg
+	newFrame.registers = vm.registers[newBase:]
 
 	vm.frameIndex++
 	vm.currentFrame = newFrame

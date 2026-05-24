@@ -22,13 +22,11 @@ func Make(op OpCode, operands ...int) []byte {
 	return ins
 }
 
-// ReadOperand reads a 2-byte operand from the instruction stream
+// ReadOperand reads a 2-byte big-endian operand from the instruction stream.
+// No bounds check; callers in the dispatch loop are responsible for emitting
+// valid bytecode. Single-expression body keeps it inside the Go inliner budget.
 func ReadOperand(ins []byte, offset int) (int, int) {
-	if offset+2 > len(ins) {
-		return 0, offset
-	}
-	operand := int(binary.BigEndian.Uint16(ins[offset:]))
-	return operand, offset + 2
+	return int(ins[offset])<<8 | int(ins[offset+1]), offset + 2
 }
 
 // Disassemble converts bytecode to a human-readable format
@@ -61,9 +59,8 @@ func Disassemble(bytecode []byte) string {
 				i++
 			}
 		case OpPush, OpLoadGlobal, OpStoreGlobal, OpLoadLocal, OpStoreLocal,
-			OpLoadFree, OpJump, OpJumpIfFalse, OpJumpIfTrue, OpCall,
+			OpLoadFree, OpJump, OpJumpIfFalse, OpJumpIfFalseBool, OpJumpIfTrue, OpCall,
 			OpGetBuiltin, OpArray, OpMap, OpStruct, OpGetField, OpSetField,
-			OpAddLocal, OpSubLocal, OpMulLocal, OpDivLocal,
 			OpGetFieldOffset, OpSetFieldOffset,
 			// Phase 4A: Const ops have 1 operand (constant value)
 			OpAddConstInt, OpSubConstInt, OpMulConstInt, OpDivConstInt, OpModConstInt,

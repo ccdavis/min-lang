@@ -91,24 +91,22 @@ func (vm *VM) currentFrame() *Frame {
 	return vm.frames[vm.framesIndex-1]
 }
 
-// push pushes a value onto the stack
+// push pushes a value onto the stack.
+// Trust the compiler to track stack discipline; the underlying slice will
+// bounds-panic if we ever exceed StackSize, which catches compiler bugs.
+// Returns error for API compatibility; the result is always nil so callers
+// inline cleanly.
 func (vm *VM) push(val Value) error {
-	if vm.sp >= StackSize {
-		return ErrStackOverflow
-	}
 	vm.stack[vm.sp] = val
 	vm.sp++
 	return nil
 }
 
-// pop pops a value from the stack
+// pop pops a value from the stack.
+// The slice bounds check guards underflow; no explicit check.
 func (vm *VM) pop() Value {
-	if vm.sp <= 0 {
-		panic(fmt.Sprintf("stack underflow: sp=%d", vm.sp))
-	}
-	val := vm.stack[vm.sp-1]
 	vm.sp--
-	return val
+	return vm.stack[vm.sp]
 }
 
 // LastPoppedStackElem returns the last popped stack element
@@ -164,74 +162,6 @@ func (vm *VM) Run() error {
 				err := vm.executeBinaryOperation(op)
 				if err != nil {
 					return err
-				}
-
-			case OpAddLocal, OpSubLocal, OpMulLocal, OpDivLocal:
-				localIndex, _ := ReadOperand(ins, ip)
-				ip += 2
-
-				// Get TOS and local value
-				tos := vm.pop()
-				local := vm.stack[frame.basePointer+localIndex]
-
-				// Perform operation directly without type checking overhead
-				// Handle integer operations (fast path)
-				if tos.Type == IntType && local.Type == IntType {
-					var result int64
-					switch op {
-					case OpAddLocal:
-						result = tos.AsInt() + local.AsInt()
-					case OpSubLocal:
-						result = tos.AsInt() - local.AsInt()
-					case OpMulLocal:
-						result = tos.AsInt() * local.AsInt()
-					case OpDivLocal:
-						if local.AsInt() == 0 {
-							return ErrDivisionByZero
-						}
-						result = tos.AsInt() / local.AsInt()
-					}
-					err := vm.push(IntValue(result))
-					if err != nil {
-						return err
-					}
-				} else if (tos.Type == FloatType || tos.Type == IntType) &&
-					(local.Type == FloatType || local.Type == IntType) {
-					// Handle float operations
-					var tosVal, localVal float64
-
-					if tos.Type == FloatType {
-						tosVal = tos.AsFloat()
-					} else {
-						tosVal = float64(tos.AsInt())
-					}
-
-					if local.Type == FloatType {
-						localVal = local.AsFloat()
-					} else {
-						localVal = float64(local.AsInt())
-					}
-
-					var result float64
-					switch op {
-					case OpAddLocal:
-						result = tosVal + localVal
-					case OpSubLocal:
-						result = tosVal - localVal
-					case OpMulLocal:
-						result = tosVal * localVal
-					case OpDivLocal:
-						if localVal == 0 {
-							return ErrDivisionByZero
-						}
-						result = tosVal / localVal
-					}
-					err := vm.push(FloatValue(result))
-					if err != nil {
-						return err
-					}
-				} else {
-					return fmt.Errorf("unsupported operand types for local operation")
 				}
 
 			case OpNeg:
@@ -534,8 +464,6 @@ func (vm *VM) Run() error {
 			case OpJump:
 				pos, _ := ReadOperand(ins, ip)
 				ip = pos
-				frame.ip = ip
-				break innerLoop // Break inner loop to reload frame
 
 			case OpJumpIfFalse:
 				pos, _ := ReadOperand(ins, ip)
@@ -544,8 +472,16 @@ func (vm *VM) Run() error {
 				condition := vm.pop()
 				if !condition.IsTruthy() {
 					ip = pos
-					frame.ip = ip
-					break innerLoop // Break inner loop to reload frame
+				}
+
+			case OpJumpIfFalseBool:
+				// Fast path: condition is known-bool, skip IsTruthy's type switch.
+				pos, _ := ReadOperand(ins, ip)
+				ip += 2
+
+				vm.sp--
+				if vm.stack[vm.sp].Data == 0 {
+					ip = pos
 				}
 
 			case OpJumpIfTrue:
@@ -555,8 +491,6 @@ func (vm *VM) Run() error {
 				condition := vm.pop()
 				if condition.IsTruthy() {
 					ip = pos
-					frame.ip = ip
-					break innerLoop // Break inner loop to reload frame
 				}
 
 			case OpCall:

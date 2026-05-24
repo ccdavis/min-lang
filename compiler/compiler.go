@@ -41,6 +41,15 @@ type Compiler struct {
 	constants   []vm.Value
 	symbolTable *SymbolTable
 
+	// Dedup tables for primitive constants — keyed by underlying scalar so
+	// repeated literals (1, 2.0, "fib", etc.) share a single pool slot.
+	// Composite types (functions, closures) are never deduped.
+	intConsts    map[int64]int
+	floatConsts  map[uint64]int
+	stringConsts map[string]int
+	boolConsts   [2]int // sentinel -1 = not yet added
+	nilConst     int    // sentinel -1 = not yet added
+
 	scopes     []CompilationScope
 	scopeIndex int
 
@@ -82,6 +91,11 @@ func New() *Compiler {
 	return &Compiler{
 		constants:    []vm.Value{},
 		symbolTable:  symbolTable,
+		intConsts:    make(map[int64]int),
+		floatConsts:  make(map[uint64]int),
+		stringConsts: make(map[string]int),
+		boolConsts:   [2]int{-1, -1},
+		nilConst:     -1,
 		scopes:       []CompilationScope{mainScope},
 		scopeIndex:   0,
 		loopStack:    []LoopContext{},
@@ -186,34 +200,62 @@ func (c *Compiler) changeOperand(opPos int, operand int) {
 	c.replaceInstruction(opPos, newInstruction)
 }
 
+// addConstant interns primitive constants so duplicate literals collapse to
+// one pool slot. Composite values (functions, closures, arrays, maps, structs)
+// are appended unconditionally — their identity matters.
 func (c *Compiler) addConstant(obj vm.Value) int {
-	c.constants = append(c.constants, obj)
-	return len(c.constants) - 1
-}
-
-// tryEmitDirectLocalOp attempts to optimize binary operations with local variables
-// If the last instruction was OpLoadLocal, it replaces it with a direct local operation
-func (c *Compiler) tryEmitDirectLocalOp(normalOp, directLocalOp vm.OpCode) {
-	// Check if last instruction was OpLoadLocal
-	if c.lastInstructionIs(vm.OpLoadLocal) {
-		// Get the position and extract the local index
-		lastPos := c.scopes[c.scopeIndex].lastInstruction.Position
-		ins := c.currentInstructions()
-
-		// Extract the local index from the OpLoadLocal instruction
-		localIndex, _ := vm.ReadOperand(ins, lastPos+1)
-
-		// Replace OpLoadLocal with the direct local operation in place
-		newIns := vm.Make(directLocalOp, localIndex)
-		for i := 0; i < len(newIns); i++ {
-			ins[lastPos+i] = newIns[i]
+	switch obj.Type {
+	case vm.IntType:
+		v := obj.AsInt()
+		if idx, ok := c.intConsts[v]; ok {
+			return idx
 		}
-
-		// Update the last instruction opcode
-		c.scopes[c.scopeIndex].lastInstruction.Opcode = directLocalOp
-	} else {
-		// No optimization possible, emit normal operation
-		c.emit(normalOp)
+		c.constants = append(c.constants, obj)
+		idx := len(c.constants) - 1
+		c.intConsts[v] = idx
+		return idx
+	case vm.FloatType:
+		// Use raw bit pattern so NaN/-0 sort by identity, not by IEEE equality.
+		bits := obj.Data
+		if idx, ok := c.floatConsts[bits]; ok {
+			return idx
+		}
+		c.constants = append(c.constants, obj)
+		idx := len(c.constants) - 1
+		c.floatConsts[bits] = idx
+		return idx
+	case vm.StringType:
+		s := obj.AsString()
+		if idx, ok := c.stringConsts[s]; ok {
+			return idx
+		}
+		c.constants = append(c.constants, obj)
+		idx := len(c.constants) - 1
+		c.stringConsts[s] = idx
+		return idx
+	case vm.BoolType:
+		slot := 0
+		if obj.AsBool() {
+			slot = 1
+		}
+		if c.boolConsts[slot] >= 0 {
+			return c.boolConsts[slot]
+		}
+		c.constants = append(c.constants, obj)
+		idx := len(c.constants) - 1
+		c.boolConsts[slot] = idx
+		return idx
+	case vm.NilType:
+		if c.nilConst >= 0 {
+			return c.nilConst
+		}
+		c.constants = append(c.constants, obj)
+		idx := len(c.constants) - 1
+		c.nilConst = idx
+		return idx
+	default:
+		c.constants = append(c.constants, obj)
+		return len(c.constants) - 1
 	}
 }
 
@@ -503,8 +545,13 @@ func (c *Compiler) Compile(node ast.Node) error {
 			return err
 		}
 
+		// Pick fast-path jump if the condition's static type is bool.
+		jumpOp := vm.OpJumpIfFalse
+		if c.inferExpressionType(node.Condition) == vm.BoolType {
+			jumpOp = vm.OpJumpIfFalseBool
+		}
 		// Emit jump instruction with placeholder
-		jumpNotTruthyPos := c.emit(vm.OpJumpIfFalse, 9999)
+		jumpNotTruthyPos := c.emit(jumpOp, 9999)
 
 		err = c.Compile(node.Consequence)
 		if err != nil {
@@ -1249,7 +1296,11 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 
 		// Jump to end if condition is false (placeholder address)
-		jumpToEnd := c.emit(vm.OpJumpIfFalse, 9999)
+		jumpOp := vm.OpJumpIfFalse
+		if c.inferExpressionType(node.Condition) == vm.BoolType {
+			jumpOp = vm.OpJumpIfFalseBool
+		}
+		jumpToEnd := c.emit(jumpOp, 9999)
 
 		// Compile the loop body
 		err = c.Compile(node.Body)

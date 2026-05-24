@@ -45,9 +45,10 @@ const (
 	OpRNot // R(A) = !R(B)
 
 	// Control flow
-	OpRJump    // PC = offset
-	OpRJumpT   // if R(A) then PC = offset
-	OpRJumpF   // if !R(A) then PC = offset
+	OpRJump     // PC = offset
+	OpRJumpT    // if R(A) then PC = offset
+	OpRJumpF    // if !R(A) then PC = offset (truthy check, handles any type)
+	OpRJumpFBool // if R(A).Data == 0 then PC = offset (fast path for bool-typed conditions)
 	OpRReturn  // return R(A)...R(A+n)
 	OpRReturnN // return (no value)
 
@@ -80,6 +81,16 @@ const (
 	OpRAddConstFloat // R(A) = R(B) + K(C) - float
 	OpRMulConstInt   // R(A) = R(B) * K(C) - int
 	OpRMulConstFloat // R(A) = R(B) * K(C) - float
+
+	// Comparison-with-constant ops (Bench note: `x2 + y2 > 4.0` in mandelbrot hot loop)
+	OpRLtConstInt    // R(A) = R(B) < K(C) - int
+	OpRLtConstFloat  // R(A) = R(B) < K(C) - float
+	OpRGtConstInt    // R(A) = R(B) > K(C) - int
+	OpRGtConstFloat  // R(A) = R(B) > K(C) - float
+	OpRLeConstInt    // R(A) = R(B) <= K(C) - int
+	OpRLeConstFloat  // R(A) = R(B) <= K(C) - float
+	OpRGeConstInt    // R(A) = R(B) >= K(C) - int
+	OpRGeConstFloat  // R(A) = R(B) >= K(C) - float
 
 	// Special optimizations
 	OpRSquareInt   // R(A) = R(B) * R(B) - int (for Mandelbrot)
@@ -191,6 +202,8 @@ func (op RegisterOpCode) String() string {
 		return "JUMPT"
 	case OpRJumpF:
 		return "JUMPF"
+	case OpRJumpFBool:
+		return "JUMPF_BOOL"
 	case OpRReturn:
 		return "RETURN"
 	case OpRReturnN:
@@ -231,6 +244,22 @@ func (op RegisterOpCode) String() string {
 		return "MULCONST_INT"
 	case OpRMulConstFloat:
 		return "MULCONST_FLOAT"
+	case OpRLtConstInt:
+		return "LTCONST_INT"
+	case OpRLtConstFloat:
+		return "LTCONST_FLOAT"
+	case OpRGtConstInt:
+		return "GTCONST_INT"
+	case OpRGtConstFloat:
+		return "GTCONST_FLOAT"
+	case OpRLeConstInt:
+		return "LECONST_INT"
+	case OpRLeConstFloat:
+		return "LECONST_FLOAT"
+	case OpRGeConstInt:
+		return "GECONST_INT"
+	case OpRGeConstFloat:
+		return "GECONST_FLOAT"
 	case OpRSquareInt:
 		return "SQUARE_INT"
 	case OpRSquareFloat:
